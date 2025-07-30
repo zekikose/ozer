@@ -66,8 +66,9 @@ const Suppliers: React.FC = () => {
         queryClient.invalidateQueries('suppliers');
         toast.success('Tedarikçi başarıyla silindi');
       },
-      onError: () => {
-        toast.error('Tedarikçi silinirken hata oluştu');
+      onError: (error: any) => {
+        const errorMessage = error.response?.data?.error || 'Tedarikçi silinirken hata oluştu';
+        toast.error(errorMessage);
       },
     }
   );
@@ -93,9 +94,35 @@ const Suppliers: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (supplierId: number) => {
-    if (window.confirm('Bu tedarikçiyi silmek istediğinizden emin misiniz?')) {
-      deleteMutation.mutate(supplierId);
+  const handleDelete = async (supplierId: number) => {
+    try {
+      // Önce tedarikçiye ait ürünleri kontrol et
+      const response = await axios.get(`/api/products?supplier_id=${supplierId}`);
+      const products = response.data.products || [];
+      
+      if (products.length > 0) {
+        const productNames = products.slice(0, 3).map((p: any) => p.name).join(', ');
+        const remainingCount = products.length - 3;
+        const message = `Bu tedarikçiye ait ${products.length} ürün bulunmaktadır:\n\n${productNames}${remainingCount > 0 ? ` ve ${remainingCount} ürün daha` : ''}\n\nTedarikçiyi silmek için önce ürünleri başka tedarikçiye transfer edin veya ürünleri silin.`;
+        
+        if (window.confirm(message)) {
+          // Kullanıcı yine de silmek istiyorsa, ürünleri de sil
+          for (const product of products) {
+            await axios.delete(`/api/products/${product.id}`);
+          }
+          deleteMutation.mutate(supplierId);
+        }
+      } else {
+        if (window.confirm('Bu tedarikçiyi silmek istediğinizden emin misiniz?')) {
+          deleteMutation.mutate(supplierId);
+        }
+      }
+    } catch (error) {
+      console.error('Tedarikçi silme kontrolü hatası:', error);
+      // Hata durumunda normal silme işlemini dene
+      if (window.confirm('Bu tedarikçiyi silmek istediğinizden emin misiniz?')) {
+        deleteMutation.mutate(supplierId);
+      }
     }
   };
 

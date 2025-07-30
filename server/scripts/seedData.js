@@ -6,6 +6,27 @@ const seedData = async () => {
   try {
     console.log('🌱 Demo veriler ekleniyor...');
 
+    // Admin kullanıcısını kontrol et veya oluştur
+    let [existingAdmin] = await pool.execute(
+      'SELECT id FROM users WHERE username = ?',
+      ['admin']
+    );
+
+    let adminUserId;
+    if (existingAdmin.length === 0) {
+      // Admin kullanıcısı yoksa oluştur
+      const adminPassword = await bcrypt.hash('admin123', 12);
+      const [adminResult] = await pool.execute(
+        'INSERT INTO users (username, email, full_name, password, role, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+        ['admin', 'admin@smstk.com', 'Admin User', adminPassword, 'admin', 1]
+      );
+      adminUserId = adminResult.insertId;
+      console.log('✅ Admin kullanıcısı oluşturuldu (ID: ' + adminUserId + ')');
+    } else {
+      adminUserId = existingAdmin[0].id;
+      console.log('✅ Admin kullanıcısı zaten mevcut (ID: ' + adminUserId + ')');
+    }
+
     // Demo kategoriler
     const categories = [
       { name: 'Elektronik', description: 'Elektronik ürünler' },
@@ -162,7 +183,7 @@ const seedData = async () => {
     }
     console.log('✅ Ürünler eklendi');
 
-    // Demo kullanıcılar
+    // Demo kullanıcılar (admin hariç)
     const users = [
       { username: 'manager', email: 'manager@smstk.com', full_name: 'Manager User', password: 'password', role: 'manager' },
       { username: 'stock_keeper', email: 'stock@smstk.com', full_name: 'Stock Keeper', password: 'password', role: 'stock_keeper' },
@@ -178,7 +199,7 @@ const seedData = async () => {
     }
     console.log('✅ Kullanıcılar eklendi');
 
-    // Demo stok hareketleri
+    // Demo stok hareketleri (admin kullanıcısı ile)
     const stockMovements = [
       {
         product_id: 1,
@@ -188,7 +209,7 @@ const seedData = async () => {
         total_amount: 1200000.00,
         reference_number: 'PO-001',
         notes: 'İlk stok girişi',
-        user_id: 1,
+        user_id: adminUserId,
         supplier_id: 1
       },
       {
@@ -199,7 +220,7 @@ const seedData = async () => {
         total_amount: 180000.00,
         reference_number: 'PO-002',
         notes: 'TV stok girişi',
-        user_id: 1,
+        user_id: adminUserId,
         supplier_id: 1
       },
       {
@@ -210,7 +231,7 @@ const seedData = async () => {
         total_amount: 300.00,
         reference_number: 'PO-003',
         notes: 'Ekmek stok girişi',
-        user_id: 1,
+        user_id: adminUserId,
         supplier_id: 2
       },
       {
@@ -221,7 +242,7 @@ const seedData = async () => {
         total_amount: 2000.00,
         reference_number: 'PO-004',
         notes: 'Süt stok girişi',
-        user_id: 1,
+        user_id: adminUserId,
         supplier_id: 2
       },
       {
@@ -232,7 +253,7 @@ const seedData = async () => {
         total_amount: 3000.00,
         reference_number: 'PO-005',
         notes: 'T-shirt stok girişi',
-        user_id: 1,
+        user_id: adminUserId,
         supplier_id: 3
       },
       {
@@ -243,7 +264,7 @@ const seedData = async () => {
         total_amount: 225000.00,
         reference_number: 'SO-001',
         notes: 'Satış',
-        user_id: 1,
+        user_id: adminUserId,
         customer_id: 1
       },
       {
@@ -254,7 +275,7 @@ const seedData = async () => {
         total_amount: 105000.00,
         reference_number: 'SO-002',
         notes: 'Satış',
-        user_id: 1,
+        user_id: adminUserId,
         customer_id: 2
       },
       {
@@ -265,7 +286,7 @@ const seedData = async () => {
         total_amount: 250.00,
         reference_number: 'SO-003',
         notes: 'Günlük satış',
-        user_id: 1,
+        user_id: adminUserId,
         customer_id: 1
       },
       {
@@ -276,7 +297,7 @@ const seedData = async () => {
         total_amount: 1875.00,
         reference_number: 'SO-004',
         notes: 'Günlük satış',
-        user_id: 1,
+        user_id: adminUserId,
         customer_id: 2
       },
       {
@@ -287,7 +308,7 @@ const seedData = async () => {
         total_amount: 2000.00,
         reference_number: 'SO-005',
         notes: 'Satış',
-        user_id: 1,
+        user_id: adminUserId,
         customer_id: 3
       }
     ];
@@ -310,6 +331,11 @@ const seedData = async () => {
     console.log('✅ Stok hareketleri eklendi');
 
     console.log('🎉 Tüm demo veriler başarıyla eklendi!');
+    console.log('📝 Giriş bilgileri:');
+    console.log('   Admin: admin / admin123');
+    console.log('   Manager: manager / password');
+    console.log('   Stock Keeper: stock_keeper / password');
+    console.log('   Viewer: viewer / password');
     process.exit(0);
   } catch (error) {
     console.error('❌ Demo veri ekleme hatası:', error);

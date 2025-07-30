@@ -229,73 +229,82 @@ const Products: React.FC = () => {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="card">
-        <div className="card-body">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Search */}
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Search Bar */}
+          <div className="flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Ürün ara..."
+                placeholder="Ürün adı, SKU veya barkod ile arayın..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="input pl-10"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+              />
+            </div>
+          </div>
+
+          {/* Filter Controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Category Filter */}
+            <div className="min-w-[150px]">
+              <SelectBox2
+                options={[
+                  { value: '', label: 'Tüm Kategoriler' },
+                  ...(categories?.map((category: any) => ({
+                    value: category.id.toString(),
+                    label: category.name
+                  })) || [])
+                ]}
+                value={selectedCategory}
+                onChange={(value) => setSelectedCategory(value.toString())}
+                placeholder="Kategori"
               />
             </div>
 
-            {/* Category Filter */}
-            <SelectBox2
-              options={[
-                { value: '', label: 'Tüm Kategoriler' },
-                ...(categories?.map((category: any) => ({
-                  value: category.id.toString(),
-                  label: category.name
-                })) || [])
-              ]}
-              value={selectedCategory}
-              onChange={(value) => setSelectedCategory(value.toString())}
-              placeholder="Tüm Kategoriler"
-            />
-
             {/* Supplier Filter */}
-            <SelectBox2
-              options={[
-                { value: '', label: 'Tüm Tedarikçiler' },
-                ...(suppliers?.map((supplier: any) => ({
-                  value: supplier.id.toString(),
-                  label: supplier.name
-                })) || [])
-              ]}
-              value={selectedSupplier}
-              onChange={(value) => setSelectedSupplier(value.toString())}
-              placeholder="Tüm Tedarikçiler"
-            />
+            <div className="min-w-[150px]">
+              <SelectBox2
+                options={[
+                  { value: '', label: 'Tüm Tedarikçiler' },
+                  ...(suppliers?.map((supplier: any) => ({
+                    value: supplier.id.toString(),
+                    label: supplier.name
+                  })) || [])
+                ]}
+                value={selectedSupplier}
+                onChange={(value) => setSelectedSupplier(value.toString())}
+                placeholder="Tedarikçi"
+              />
+            </div>
 
             {/* Warehouse Filter */}
-            <SelectBox2
-              options={[
-                { value: '', label: 'Tüm Depolar' },
-                ...(warehouses?.map((warehouse: any) => ({
-                  value: warehouse.id.toString(),
-                  label: warehouse.name
-                })) || [])
-              ]}
-              value={selectedWarehouse}
-              onChange={(value) => setSelectedWarehouse(value.toString())}
-              placeholder="Tüm Depolar"
-            />
+            <div className="min-w-[150px]">
+              <SelectBox2
+                options={[
+                  { value: '', label: 'Tüm Depolar' },
+                  ...(warehouses?.map((warehouse: any) => ({
+                    value: warehouse.id.toString(),
+                    label: warehouse.name
+                  })) || [])
+                ]}
+                value={selectedWarehouse}
+                onChange={(value) => setSelectedWarehouse(value.toString())}
+                placeholder="Depo"
+              />
+            </div>
 
             {/* Low Stock Filter */}
-            <label className="flex items-center space-x-2">
+            <label className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">
               <input
                 type="checkbox"
                 checked={showLowStock}
                 onChange={(e) => setShowLowStock(e.target.checked)}
-                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-700">Sadece Düşük Stok</span>
+              <span className="text-sm font-medium text-gray-700">Düşük Stok</span>
             </label>
 
             {/* Clear Filters */}
@@ -308,13 +317,77 @@ const Products: React.FC = () => {
                 setShowLowStock(false);
                 setCurrentPage(1);
               }}
-              className="btn-secondary"
+              className="flex items-center space-x-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200"
             >
-              <Filter className="h-4 w-4 mr-2" />
-              Filtreleri Temizle
+              <X className="h-4 w-4" />
+              <span>Temizle</span>
             </button>
           </div>
         </div>
+
+        {/* Active Filters Display */}
+        {(searchTerm || selectedCategory || selectedSupplier || selectedWarehouse || showLowStock) && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <span>Aktif Filtreler:</span>
+              {searchTerm && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Arama: "{searchTerm}"
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="ml-1 text-blue-600 hover:text-blue-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {selectedCategory && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Kategori: {categories?.find((c: any) => c.id.toString() === selectedCategory)?.name}
+                  <button
+                    onClick={() => setSelectedCategory('')}
+                    className="ml-1 text-green-600 hover:text-green-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {selectedSupplier && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  Tedarikçi: {suppliers?.find((s: any) => s.id.toString() === selectedSupplier)?.name}
+                  <button
+                    onClick={() => setSelectedSupplier('')}
+                    className="ml-1 text-purple-600 hover:text-purple-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {selectedWarehouse && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                  Depo: {warehouses?.find((w: any) => w.id.toString() === selectedWarehouse)?.name}
+                  <button
+                    onClick={() => setSelectedWarehouse('')}
+                    className="ml-1 text-orange-600 hover:text-orange-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {showLowStock && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  Düşük Stok
+                  <button
+                    onClick={() => setShowLowStock(false)}
+                    className="ml-1 text-red-600 hover:text-red-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Products Table */}
@@ -507,7 +580,7 @@ const Products: React.FC = () => {
                         const newSKU = generateSKU();
                         reset({ ...watch(), sku: newSKU });
                       }}
-                      className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md border border-gray-300"
+                      className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300 transition-colors duration-200"
                     >
                       Yenile
                     </button>

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useLocation } from 'react-router-dom';
-import { ArrowDown, Package, Calendar, Search } from 'lucide-react';
+import { ArrowDown, Package } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -14,16 +14,12 @@ interface StockOutForm {
   customer_id: string;
   reference_number: string;
   notes: string;
-  movement_date: string;
 }
 
 const StockOut: React.FC = () => {
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [productSearch, setProductSearch] = useState('');
-  const [showProductDropdown, setShowProductDropdown] = useState(false);
   const queryClient = useQueryClient();
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
@@ -89,35 +85,14 @@ const StockOut: React.FC = () => {
     ? parseFloat(selectedQuantity.toString()) * parseFloat(selectedUnitPrice.toString())
     : 0;
 
-  // Filter products based on search
-  const filteredProducts = products?.filter((product: any) =>
-    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    product.sku.toLowerCase().includes(productSearch.toLowerCase())
-  ) || [];
-
   // Load selected product from location state
   useEffect(() => {
     const selectedProduct = location.state?.selectedProduct;
     if (selectedProduct) {
       setValue('product_id', selectedProduct.id.toString());
-      setProductSearch(selectedProduct.name);
       toast.success(`${selectedProduct.name} ürünü seçildi!`);
     }
-  }, [location.state, setValue, setProductSearch]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowProductDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+  }, [location.state, setValue]);
 
   return (
     <div className="space-y-6">
@@ -133,64 +108,21 @@ const StockOut: React.FC = () => {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Product Selection */}
-              <div className="relative" ref={dropdownRef}>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Ürün *
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Ürün adı veya SKU ile arayın..."
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value);
-                      setShowProductDropdown(true);
-                    }}
-                    onFocus={() => setShowProductDropdown(true)}
-                    className="input pr-10"
-                  />
-                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                </div>
-                
-                {/* Product Dropdown */}
-                {showProductDropdown && productSearch && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {filteredProducts.length > 0 ? (
-                      filteredProducts.map((product: any) => (
-                        <div
-                          key={product.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
-                          onClick={() => {
-                            setValue('product_id', product.id.toString());
-                            setProductSearch(product.name);
-                            setShowProductDropdown(false);
-                          }}
-                        >
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-gray-600">
-                            SKU: {product.sku} | Stok: {product.current_stock}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-2 text-gray-500">Ürün bulunamadı</div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Hidden select for form validation */}
-                <select
-                  {...register('product_id', { required: 'Ürün seçin' })}
-                  className="hidden"
-                >
-                  <option value="">Ürün seçin</option>
-                  {products?.map((product: any) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-                
+                <SelectBox2
+                  options={products?.map((product: any) => ({
+                    value: product.id.toString(),
+                    label: `${product.name} (SKU: ${product.sku} | Stok: ${product.current_stock})`
+                  })) || []}
+                  value={watch('product_id') || ''}
+                  onChange={(value) => setValue('product_id', value.toString())}
+                  placeholder="Ürün seçin"
+                  required
+                  error={!!errors.product_id}
+                />
                 {errors.product_id && (
                   <p className="mt-1 text-sm text-red-600">{errors.product_id.message}</p>
                 )}
@@ -275,21 +207,7 @@ const StockOut: React.FC = () => {
                 )}
               </div>
 
-              {/* Movement Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  İşlem Tarihi
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    {...register('movement_date')}
-                    type="date"
-                    className="input pl-10"
-                    defaultValue={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-              </div>
+
 
               {/* Reference Number */}
               <div>

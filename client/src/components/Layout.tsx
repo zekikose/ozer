@@ -27,11 +27,26 @@ const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [productsMenuOpen, setProductsMenuOpen] = useState(false);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   const isDashboardActive = location.pathname === '/dashboard';
+
+  // If not authenticated and not on dashboard, redirect to login
+  if (!loading && !user && location.pathname !== '/dashboard') {
+    navigate('/login');
+    return null;
+  }
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   const navigation = [
     { name: 'Kategoriler', href: '/categories', icon: FolderOpen, permission: 'categories:read' },
@@ -219,25 +234,28 @@ const Layout: React.FC = () => {
             </button>
           </div>
           <nav className="flex-1 space-y-1 px-2 py-4">
-            {/* Dashboard - En üstte ayrı */}
-            {hasPermission('dashboard:read') && (
-              <Link
-                to="/dashboard"
-                className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                  location.pathname === '/dashboard'
-                    ? 'bg-primary-100 text-primary-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Home className="mr-3 h-5 w-5" />
-                Dashboard
-              </Link>
-            )}
+            {/* Dashboard - Always visible */}
+            <Link
+              to="/dashboard"
+              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                location.pathname === '/dashboard'
+                  ? 'bg-primary-100 text-primary-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <Home className="mr-3 h-5 w-5" />
+              Dashboard
+            </Link>
             
-            {renderProductsMenu()}
-            {navigation.map(renderNavigationItem)}
-            {renderSettingsMenu()}
+            {/* Show other navigation items only if authenticated */}
+            {user && (
+              <>
+                {renderProductsMenu()}
+                {navigation.map(renderNavigationItem)}
+                {renderSettingsMenu()}
+              </>
+            )}
           </nav>
         </div>
       </div>
@@ -251,25 +269,28 @@ const Layout: React.FC = () => {
             </Link>
           </div>
           <nav className="flex-1 space-y-1 px-2 py-4">
-            {/* Dashboard - En üstte ayrı */}
-            {hasPermission('dashboard:read') && (
-              <Link
-                to="/dashboard"
-                className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                  location.pathname === '/dashboard'
-                    ? 'bg-primary-100 text-primary-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Home className="mr-3 h-5 w-5" />
-                Dashboard
-              </Link>
-            )}
+            {/* Dashboard - Always visible */}
+            <Link
+              to="/dashboard"
+              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                location.pathname === '/dashboard'
+                  ? 'bg-primary-100 text-primary-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <Home className="mr-3 h-5 w-5" />
+              Dashboard
+            </Link>
             
-            {renderProductsMenu()}
-            {navigation.map(renderNavigationItem)}
-            {renderSettingsMenu()}
+            {/* Show other navigation items only if authenticated */}
+            {user && (
+              <>
+                {renderProductsMenu()}
+                {navigation.map(renderNavigationItem)}
+                {renderSettingsMenu()}
+              </>
+            )}
           </nav>
         </div>
       </div>
@@ -300,31 +321,43 @@ const Layout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-x-4 lg:gap-x-6">
-            <button type="button" className="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500">
-              <Bell className="h-6 w-6" />
-            </button>
+            {user ? (
+              <>
+                <button type="button" className="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500">
+                  <Bell className="h-6 w-6" />
+                </button>
 
-            {/* Profile dropdown */}
-            <div className="relative">
-              <div className="flex items-center gap-x-3">
-                <div className="flex items-center gap-x-3">
-                  <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
-                    <User className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="hidden lg:block">
-                    <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
-                    <p className="text-xs text-gray-500">{user?.role}</p>
+                {/* Profile dropdown */}
+                <div className="relative">
+                  <div className="flex items-center gap-x-3">
+                    <div className="flex items-center gap-x-3">
+                      <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
+                        <User className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="hidden lg:block">
+                        <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
+                        <p className="text-xs text-gray-500">{user?.role}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-x-2 text-sm text-gray-700 hover:text-gray-900"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="hidden lg:block">Çıkış</span>
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-x-2 text-sm text-gray-700 hover:text-gray-900"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden lg:block">Çıkış</span>
-                </button>
-              </div>
-            </div>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-x-2 text-sm text-gray-700 hover:text-gray-900 bg-primary-50 hover:bg-primary-100 px-3 py-2 rounded-md transition-colors"
+              >
+                <User className="h-4 w-4" />
+                <span>Giriş Yap</span>
+              </Link>
+            )}
           </div>
         </div>
 

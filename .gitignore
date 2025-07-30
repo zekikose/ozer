@@ -1,12 +1,12 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+*/node_modules/
 
 # Production builds
 build/
 dist/
+*/build/
+*/dist/
 
 # Environment variables
 .env
@@ -14,34 +14,25 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+*/config.env
 
 # Logs
-logs
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
 # Runtime data
-pids
+pids/
 *.pid
 *.seed
 *.pid.lock
 
 # Coverage directory used by tools like istanbul
 coverage/
+*.lcov
 
 # nyc test coverage
 .nyc_output
@@ -51,6 +42,15 @@ jspm_packages/
 
 # Optional npm cache directory
 .npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
 
 # Optional REPL history
 .node_repl_history
@@ -65,30 +65,79 @@ jspm_packages/
 .cache
 .parcel-cache
 
-# next.js build output
+# Next.js build output
 .next
 
-# nuxt.js build output
+# Nuxt.js build / generate output
 .nuxt
 
-# vuepress build output
-.vuepress/dist
+# Gatsby files
+.cache/
+public
 
-# Serverless directories
-.serverless
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
+# Storybook build outputs
+.out
+.storybook-out
 
 # Temporary folders
 tmp/
 temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Deployment packages
+*.tar.gz
+deployment/*.tar.gz
+
+# Uploads
+uploads/
+*/uploads/
+
+# SSL certificates
+ssl/
+*/ssl/
+
+# Database dumps
+*.sql
+*.dump
+
+# Backup files
+backups/
+*/backups/
+
+# PM2 files
+.pm2/
+
+# Nginx logs
+nginx-logs/
+
+# System files
+*.pid
+*.lock
+
+# Test files
+test-results/
+coverage/
+
+# Build artifacts
+*.map
+*.min.js
+*.min.css
+
+# Package lock files (optional - uncomment if you want to ignore them)
+# package-lock.json
+# yarn.lock

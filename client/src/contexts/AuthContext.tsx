@@ -39,12 +39,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Set up axios defaults
+  // Set up axios interceptor
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
+    const interceptor = axios.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.request.eject(interceptor);
+    };
   }, []);
 
   // Check if user is logged in on app start
@@ -75,7 +87,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const { token, user } = response.data;
       localStorage.setItem('token', token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Login failed');
@@ -84,7 +95,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
     setUser(null);
   };
 
@@ -98,7 +108,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       const { token, user } = response.data;
       localStorage.setItem('token', token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Registration failed');

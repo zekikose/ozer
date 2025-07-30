@@ -15,7 +15,6 @@ interface StockInForm {
   supplier_id: string;
   reference_number: string;
   notes: string;
-  movement_date: string;
 }
 
 interface NewProductForm {
@@ -48,11 +47,7 @@ const StockIn: React.FC = () => {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<StockInForm>({
-    defaultValues: {
-      movement_date: new Date().toISOString().split('T')[0]
-    }
-  });
+  } = useForm<StockInForm>();
 
   const {
     register: registerNewProduct,
@@ -126,13 +121,16 @@ const StockIn: React.FC = () => {
   // Stock in mutation
   const stockInMutation = useMutation(
     async (data: StockInForm) => {
-      const response = await axios.post('/api/stock/in', {
+      console.log('Sending data:', data); // Debug log
+      const requestData = {
         ...data,
         product_id: parseInt(data.product_id),
-        supplier_id: parseInt(data.supplier_id),
+        supplier_id: data.supplier_id ? parseInt(data.supplier_id) : undefined,
         quantity: parseInt(data.quantity),
         unit_price: parseFloat(data.unit_price)
-      });
+      };
+      console.log('Request data:', requestData); // Debug log
+      const response = await axios.post('/api/stock/in', requestData);
       return response.data;
     },
     {
@@ -143,6 +141,10 @@ const StockIn: React.FC = () => {
         queryClient.invalidateQueries('stock-movements');
       },
       onError: (error: any) => {
+        console.error('Stock in error:', error.response?.data); // Debug log
+        console.error('Error status:', error.response?.status); // Debug log
+        console.error('Error message:', error.message); // Debug log
+        console.error('Full error:', error); // Debug log
         toast.error(error.response?.data?.error || 'Stok girişi yapılırken hata oluştu');
       }
     }
@@ -151,7 +153,8 @@ const StockIn: React.FC = () => {
   // Create new product mutation
   const createProductMutation = useMutation(
     async (data: NewProductForm) => {
-      const response = await axios.post('/api/products', {
+      console.log('Creating product with data:', data); // Debug log
+      const requestData = {
         ...data,
         category_id: parseInt(data.category_id),
         supplier_id: parseInt(data.supplier_id),
@@ -159,7 +162,9 @@ const StockIn: React.FC = () => {
         price: parseFloat(data.price),
         min_stock: parseInt(data.min_stock),
         initial_stock: parseInt(data.initial_stock)
-      });
+      };
+      console.log('Request data:', requestData); // Debug log
+      const response = await axios.post('/api/products', requestData);
       return response.data;
     },
     {
@@ -173,6 +178,9 @@ const StockIn: React.FC = () => {
         setProductSearch(data.product.name);
       },
       onError: (error: any) => {
+        console.error('Create product error:', error.response?.data); // Debug log
+        console.error('Error status:', error.response?.status); // Debug log
+        console.error('Full error:', error); // Debug log
         toast.error(error.response?.data?.error || 'Ürün oluşturulurken hata oluştu');
       }
     }
@@ -221,10 +229,10 @@ const StockIn: React.FC = () => {
         <button
           type="button"
           onClick={() => setShowNewProductModal(true)}
-          className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+          className="btn-primary"
         >
-          <Plus className="h-5 w-5" />
-          <span>Yeni Ürün Tanımla</span>
+          <Plus className="h-4 w-4 mr-2" />
+          Yeni Ürün Tanımla
         </button>
       </div>
 
@@ -253,10 +261,10 @@ const StockIn: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowNewProductModal(true)}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 shadow-sm hover:shadow-md transition-all duration-200"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 btn-primary text-xs px-3 py-1.5"
                 >
-                  <Plus className="h-3 w-3" />
-                  <span>Yeni</span>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Yeni
                 </button>
               </div>
               
@@ -365,18 +373,7 @@ const StockIn: React.FC = () => {
               )}
             </div>
 
-            {/* Movement Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Giriş Tarihi
-              </label>
-              <input
-                type="date"
-                {...register('movement_date')}
-                className="input"
-                defaultValue={new Date().toISOString().split('T')[0]}
-              />
-            </div>
+
 
             {/* Reference Number */}
             <div>
@@ -484,22 +481,29 @@ const StockIn: React.FC = () => {
                 {/* SKU */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    SKU * <span className="text-xs text-gray-500">(Otomatik oluşturulur)</span>
+                    SKU *
                   </label>
-                  <input
-                    type="text"
-                    {...registerNewProduct('sku', { required: 'SKU gerekli' })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-gray-50 cursor-not-allowed"
-                    placeholder="Ürün adı girildikten sonra otomatik oluşturulacak"
-                    readOnly
-                  />
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      {...registerNewProduct('sku', { required: 'SKU gerekli' })}
+                      className="input flex-1"
+                      placeholder="SKU otomatik oluşturulacak"
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newSKU = generateSKU(watchedProductName);
+                        setValueNewProduct('sku', newSKU);
+                      }}
+                      className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300 transition-colors duration-200"
+                    >
+                      Yenile
+                    </button>
+                  </div>
                   {newProductErrors.sku && (
                     <p className="mt-1 text-sm text-red-600">{newProductErrors.sku.message}</p>
-                  )}
-                  {watchedProductName && watchedProductName.length > 2 && (
-                    <p className="mt-1 text-sm text-green-600">
-                      ✓ SKU otomatik oluşturuldu: {generateSKU(watchedProductName)}
-                    </p>
                   )}
                 </div>
 

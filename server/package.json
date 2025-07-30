@@ -1,25 +1,35 @@
 {
   "name": "smstk-server",
   "version": "1.0.0",
-  "description": "Stock Management System Backend",
+  "description": "SMSTK Backend API",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "build": "echo 'No build step required for Node.js'",
+    "test": "echo 'No tests specified'",
+    "lint": "echo 'No linting configured'"
   },
+  "keywords": ["stock-management", "api", "nodejs", "express"],
+  "author": "SMSTK Team",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "mysql2": "^3.6.5",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "express-validator": "^7.0.1",
-    "multer": "^1.4.5-lts.1",
+    "cors": "^2.8.5",
     "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5"
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1",
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 } 

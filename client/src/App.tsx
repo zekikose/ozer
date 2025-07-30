@@ -60,27 +60,20 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Layout />
-                  </ProtectedRoute>
-                }
-              >
+              <Route path="/" element={<Layout />}>
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
-                <Route path="products" element={<Products />} />
-                <Route path="categories" element={<Categories />} />
-                <Route path="suppliers" element={<Suppliers />} />
-                <Route path="customers" element={<Customers />} />
-                <Route path="warehouses" element={<Warehouses />} />
-                <Route path="stock-in" element={<StockIn />} />
-                <Route path="stock-out" element={<StockOut />} />
-                <Route path="stock-movements" element={<StockMovements />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="user-management" element={<UserManagement />} />
+                <Route path="products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+                <Route path="categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+                <Route path="suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
+                <Route path="customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+                <Route path="warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
+                <Route path="stock-in" element={<ProtectedRoute><StockIn /></ProtectedRoute>} />
+                <Route path="stock-out" element={<ProtectedRoute><StockOut /></ProtectedRoute>} />
+                <Route path="stock-movements" element={<ProtectedRoute><StockMovements /></ProtectedRoute>} />
+                <Route path="reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="user-management" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
               </Route>
             </Routes>
             <Toaster
