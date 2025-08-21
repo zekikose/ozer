@@ -19,7 +19,7 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
-  Shield
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -31,7 +31,7 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isDashboardActive = location.pathname === '/dashboard';
+
 
   // If not authenticated and not on dashboard, redirect to login
   if (!loading && !user && location.pathname !== '/dashboard') {
@@ -61,11 +61,12 @@ const Layout: React.FC = () => {
     { name: 'Ürün Listesi', href: '/products', icon: Package, permission: 'products:read' },
     { name: 'Stok Girişi', href: '/stock-in', icon: ArrowUp, permission: 'stock:in' },
     { name: 'Stok Çıkışı', href: '/stock-out', icon: ArrowDown, permission: 'stock:out' },
+    { name: 'Emanet Listesi', href: '/loan-items', icon: FileText, permission: 'stock:read' },
   ];
 
   const settingsSubMenu = [
     { name: 'Sistem Ayarları', href: '/settings', icon: Settings, permission: 'settings:read' },
-    { name: 'Kullanıcı Yönetimi', href: '/user-management', icon: Shield, permission: 'users:read' },
+    { name: 'Kullanıcı Yönetimi', href: '/user-management', icon: User, permission: 'users:read' },
   ];
 
   const handleLogout = () => {
@@ -75,7 +76,8 @@ const Layout: React.FC = () => {
 
   const isProductsActive = location.pathname === '/products' || 
                           location.pathname === '/stock-in' || 
-                          location.pathname === '/stock-out';
+                          location.pathname === '/stock-out' ||
+                          location.pathname === '/loan-items';
   
   const isSettingsActive = location.pathname === '/settings' || 
                           location.pathname === '/user-management';

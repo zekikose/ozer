@@ -27,7 +27,7 @@ const Warehouses: React.FC = () => {
   } = useForm<WarehouseForm>();
 
   // Fetch warehouses
-  const { data: warehouses, isLoading, error } = useQuery('warehouses', async () => {
+  const { data: warehouses, isLoading } = useQuery('warehouses', async () => {
     const response = await axios.get('/api/warehouses');
     return response.data.warehouses;
   }, {
@@ -46,18 +46,11 @@ const Warehouses: React.FC = () => {
   // Add/Edit warehouse mutation
   const warehouseMutation = useMutation(
     async (warehouseData: WarehouseForm) => {
-      console.log('Warehouse mutation called with:', warehouseData);
-      console.log('Editing warehouse ID:', editingWarehouse?.id);
-      
       if (editingWarehouse) {
-        console.log('Making PUT request to:', `/api/warehouses/${editingWarehouse.id}`);
         const response = await axios.put(`/api/warehouses/${editingWarehouse.id}`, warehouseData);
-        console.log('PUT response:', response.data);
         return response.data;
       } else {
-        console.log('Making POST request to:', '/api/warehouses');
         const response = await axios.post('/api/warehouses', warehouseData);
-        console.log('POST response:', response.data);
         return response.data;
       }
     },
@@ -104,9 +97,6 @@ const Warehouses: React.FC = () => {
   const onSubmit = async (data: WarehouseForm) => {
     setIsSubmitting(true);
     try {
-      console.log('Submitting warehouse data:', data);
-      console.log('Editing warehouse:', editingWarehouse);
-      console.log('Axios headers:', axios.defaults.headers.common);
       await warehouseMutation.mutateAsync(data);
     } catch (error) {
       console.error('Form submission error:', error);

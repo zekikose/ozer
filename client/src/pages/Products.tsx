@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { Plus, Search, Filter, Edit, Trash2, Eye, X } from 'lucide-react';
+import { 
+  Plus, 
+  Search, 
+  Edit, 
+  Trash2, 
+  Eye, 
+  X, 
+  Filter,
+  Download,
+  Upload,
+  RefreshCw,
+  Package,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -21,8 +37,34 @@ interface ProductForm {
   initial_stock: number;
 }
 
+interface Product {
+  id: number;
+  name: string;
+  sku: string;
+  barcode?: string;
+  description?: string;
+  category_id: number;
+  supplier_id: number;
+  warehouse_id: number;
+  unit: string;
+  unit_price: string;
+  cost_price: string;
+  min_stock_level: number;
+  max_stock_level: number;
+  current_stock: number;
+  category_name?: string;
+  supplier_name?: string;
+  warehouse_name?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const Products: React.FC = () => {
   const { hasPermission } = useAuth();
+  const queryClient = useQueryClient();
+  
+  // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -31,11 +73,11 @@ const Products: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [viewingProduct, setViewingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   
-  const queryClient = useQueryClient();
-  
+  // Form setup
   const {
     register,
     handleSubmit,
@@ -45,13 +87,13 @@ const Products: React.FC = () => {
     formState: { errors },
   } = useForm<ProductForm>();
 
-  // Fetch products
-  const { data: productsData, isLoading } = useQuery(
+  // Queries
+  const { data: productsData, isLoading, refetch } = useQuery(
     ['products', currentPage, searchTerm, selectedCategory, selectedSupplier, selectedWarehouse, showLowStock],
     async () => {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: '10',
+        limit: '12',
         search: searchTerm,
         ...(selectedCategory && { category_id: selectedCategory }),
         ...(selectedSupplier && { supplier_id: selectedSupplier }),
@@ -61,28 +103,29 @@ const Products: React.FC = () => {
       
       const response = await axios.get(`/api/products?${params}`);
       return response.data;
+    },
+    {
+      retry: 3,
+      refetchOnWindowFocus: false,
     }
   );
 
-  // Fetch categories for filter
   const { data: categories } = useQuery('categories', async () => {
     const response = await axios.get('/api/categories');
     return response.data.categories;
   });
 
-  // Fetch suppliers for filter
   const { data: suppliers } = useQuery('suppliers', async () => {
     const response = await axios.get('/api/suppliers');
     return response.data.suppliers;
   });
 
-  // Fetch warehouses for filter
   const { data: warehouses } = useQuery('warehouses', async () => {
     const response = await axios.get('/api/warehouses');
     return response.data.warehouses;
   });
 
-  // Add product mutation
+  // Mutations
   const addProductMutation = useMutation(
     async (productData: ProductForm) => {
       const response = await axios.post('/api/products', productData);
@@ -91,17 +134,16 @@ const Products: React.FC = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('products');
-        toast.success('Ürün başarıyla eklendi');
+        toast.success('✅ Ürün başarıyla eklendi');
         setShowModal(false);
         reset();
       },
       onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Ürün eklenirken hata oluştu');
+        toast.error(error.response?.data?.error || '❌ Ürün eklenirken hata oluştu');
       },
     }
   );
 
-  // Delete product mutation
   const deleteMutation = useMutation(
     async (productId: number) => {
       await axios.delete(`/api/products/${productId}`);
@@ -109,15 +151,14 @@ const Products: React.FC = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('products');
-        toast.success('Ürün başarıyla silindi');
+        toast.success('✅ Ürün başarıyla silindi');
       },
       onError: () => {
-        toast.error('Ürün silinirken hata oluştu');
+        toast.error('❌ Ürün silinirken hata oluştu');
       },
     }
   );
 
-  // Update product mutation
   const updateProductMutation = useMutation(
     async (productData: ProductForm & { id: number }) => {
       const response = await axios.put(`/api/products/${productData.id}`, productData);
@@ -126,17 +167,18 @@ const Products: React.FC = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('products');
-        toast.success('Ürün başarıyla güncellendi');
+        toast.success('✅ Ürün başarıyla güncellendi');
         setShowModal(false);
         setEditingProduct(null);
         reset();
       },
       onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Ürün güncellenirken hata oluştu');
+        toast.error(error.response?.data?.error || '❌ Ürün güncellenirken hata oluştu');
       },
     }
   );
 
+  // Form submission
   const onSubmit = async (data: ProductForm) => {
     setIsSubmitting(true);
     try {
@@ -150,9 +192,8 @@ const Products: React.FC = () => {
     }
   };
 
-  // Ürün adını izle ve SKU'yu otomatik oluştur
+  // Auto-generate SKU
   const watchedProductName = watch('name');
-  
   useEffect(() => {
     if (watchedProductName && watchedProductName.length > 2) {
       const autoSKU = generateSKU(watchedProductName);
@@ -160,13 +201,14 @@ const Products: React.FC = () => {
     }
   }, [watchedProductName, setValue]);
 
+  // Modal handlers
   const openModal = () => {
     setShowModal(true);
     setEditingProduct(null);
     const autoSKU = generateSKU();
     reset({
       sku: autoSKU,
-      unit: 'adet' // Varsayılan birim
+      unit: 'adet'
     });
   };
 
@@ -176,13 +218,14 @@ const Products: React.FC = () => {
     reset();
   };
 
+  // Action handlers
   const handleDelete = (productId: number) => {
     if (window.confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
       deleteMutation.mutate(productId);
     }
   };
 
-  const handleEdit = (product: any) => {
+  const handleEdit = (product: Product) => {
     setEditingProduct(product);
     reset({
       name: product.name,
@@ -192,14 +235,14 @@ const Products: React.FC = () => {
       supplier_id: product.supplier_id?.toString() || '',
       warehouse_id: product.warehouse_id?.toString() || '',
       unit: product.unit || 'adet',
-      price: product.unit_price || 0,
+      price: parseFloat(product.unit_price) || 0,
       min_stock: product.min_stock_level || 0,
       initial_stock: product.current_stock || 0
     });
     setShowModal(true);
   };
 
-  const handleView = (product: any) => {
+  const handleView = (product: Product) => {
     setViewingProduct(product);
   };
 
@@ -207,271 +250,239 @@ const Products: React.FC = () => {
     setViewingProduct(null);
   };
 
+  // Utility functions
   const getStockStatus = (currentStock: number, minStock: number) => {
-    if (currentStock === 0) return { status: 'out-of-stock', label: 'Stokta Yok', color: 'text-red-600 bg-red-100' };
-    if (currentStock <= minStock) return { status: 'low-stock', label: 'Düşük Stok', color: 'text-yellow-600 bg-yellow-100' };
-    return { status: 'in-stock', label: 'Stokta', color: 'text-green-600 bg-green-100' };
+    if (currentStock === 0) return { 
+      status: 'out-of-stock', 
+      label: 'Stokta Yok', 
+      color: 'text-red-600 bg-red-50 border-red-200',
+      icon: XCircle
+    };
+    if (currentStock <= minStock) return { 
+      status: 'low-stock', 
+      label: 'Düşük Stok', 
+      color: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+      icon: AlertTriangle
+    };
+    return { 
+      status: 'in-stock', 
+      label: 'Stokta', 
+      color: 'text-green-600 bg-green-50 border-green-200',
+      icon: CheckCircle
+    };
   };
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
+    setSelectedSupplier('');
+    setSelectedWarehouse('');
+    setShowLowStock(false);
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = searchTerm || selectedCategory || selectedSupplier || selectedWarehouse || showLowStock;
+
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ürünler</h1>
-          <p className="text-gray-600">Stok yönetimi için ürün listesi</p>
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Ürünler</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Stok yönetimi için ürün listesi ve yönetimi
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => refetch()}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Yenile
+              </button>
+              {hasPermission('products:create') && (
+                <button
+                  onClick={openModal}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Yeni Ürün
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-        {hasPermission('products:create') && (
-          <button onClick={openModal} className="btn-primary">
-            <Plus className="h-4 w-4 mr-2" />
-            Yeni Ürün
-          </button>
-        )}
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Search Bar */}
-          <div className="flex-1 max-w-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-gray-900 flex items-center">
+              <Filter className="h-5 w-5 mr-2" />
+              Filtreler
+            </h2>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Filtreleri Temizle
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Ürün adı, SKU veya barkod ile arayın..."
+                placeholder="Ürün ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-          </div>
 
-          {/* Filter Controls */}
-          <div className="flex flex-wrap items-center gap-3">
             {/* Category Filter */}
-            <div className="min-w-[150px]">
-              <SelectBox2
-                options={[
-                  { value: '', label: 'Tüm Kategoriler' },
-                  ...(categories?.map((category: any) => ({
-                    value: category.id.toString(),
-                    label: category.name
-                  })) || [])
-                ]}
-                value={selectedCategory}
-                onChange={(value) => setSelectedCategory(value.toString())}
-                placeholder="Kategori"
-              />
-            </div>
+            <SelectBox2
+              options={[
+                { value: '', label: 'Tüm Kategoriler' },
+                ...(categories?.map((category: any) => ({
+                  value: category.id.toString(),
+                  label: category.name
+                })) || [])
+              ]}
+              value={selectedCategory}
+              onChange={(value) => setSelectedCategory(value.toString())}
+              placeholder="Kategori"
+            />
 
             {/* Supplier Filter */}
-            <div className="min-w-[150px]">
-              <SelectBox2
-                options={[
-                  { value: '', label: 'Tüm Tedarikçiler' },
-                  ...(suppliers?.map((supplier: any) => ({
-                    value: supplier.id.toString(),
-                    label: supplier.name
-                  })) || [])
-                ]}
-                value={selectedSupplier}
-                onChange={(value) => setSelectedSupplier(value.toString())}
-                placeholder="Tedarikçi"
-              />
-            </div>
+            <SelectBox2
+              options={[
+                { value: '', label: 'Tüm Tedarikçiler' },
+                ...(suppliers?.map((supplier: any) => ({
+                  value: supplier.id.toString(),
+                  label: supplier.name
+                })) || [])
+              ]}
+              value={selectedSupplier}
+              onChange={(value) => setSelectedSupplier(value.toString())}
+              placeholder="Tedarikçi"
+            />
 
             {/* Warehouse Filter */}
-            <div className="min-w-[150px]">
-              <SelectBox2
-                options={[
-                  { value: '', label: 'Tüm Depolar' },
-                  ...(warehouses?.map((warehouse: any) => ({
-                    value: warehouse.id.toString(),
-                    label: warehouse.name
-                  })) || [])
-                ]}
-                value={selectedWarehouse}
-                onChange={(value) => setSelectedWarehouse(value.toString())}
-                placeholder="Depo"
-              />
-            </div>
+            <SelectBox2
+              options={[
+                { value: '', label: 'Tüm Depolar' },
+                ...(warehouses?.map((warehouse: any) => ({
+                  value: warehouse.id.toString(),
+                  label: warehouse.name
+                })) || [])
+              ]}
+              value={selectedWarehouse}
+              onChange={(value) => setSelectedWarehouse(value.toString())}
+              placeholder="Depo"
+            />
+          </div>
 
-            {/* Low Stock Filter */}
-            <label className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">
+          {/* Additional Filters */}
+          <div className="mt-4 flex items-center space-x-4">
+            <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 checked={showLowStock}
                 onChange={(e) => setShowLowStock(e.target.checked)}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-sm font-medium text-gray-700">Düşük Stok</span>
+              <span className="text-sm text-gray-700">Sadece düşük stoklu ürünler</span>
             </label>
 
-            {/* Clear Filters */}
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedCategory('');
-                setSelectedSupplier('');
-                setSelectedWarehouse('');
-                setShowLowStock(false);
-                setCurrentPage(1);
-              }}
-              className="flex items-center space-x-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200"
-            >
-              <X className="h-4 w-4" />
-              <span>Temizle</span>
-            </button>
+            {/* View Mode Toggle */}
+            <div className="flex items-center space-x-2 ml-auto">
+              <span className="text-sm text-gray-700">Görünüm:</span>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <Package className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <TrendingUp className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Active Filters Display */}
-        {(searchTerm || selectedCategory || selectedSupplier || selectedWarehouse || showLowStock) && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <span>Aktif Filtreler:</span>
-              {searchTerm && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Arama: "{searchTerm}"
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="ml-1 text-blue-600 hover:text-blue-800"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {selectedCategory && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  Kategori: {categories?.find((c: any) => c.id.toString() === selectedCategory)?.name}
-                  <button
-                    onClick={() => setSelectedCategory('')}
-                    className="ml-1 text-green-600 hover:text-green-800"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {selectedSupplier && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  Tedarikçi: {suppliers?.find((s: any) => s.id.toString() === selectedSupplier)?.name}
-                  <button
-                    onClick={() => setSelectedSupplier('')}
-                    className="ml-1 text-purple-600 hover:text-purple-800"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {selectedWarehouse && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                  Depo: {warehouses?.find((w: any) => w.id.toString() === selectedWarehouse)?.name}
-                  <button
-                    onClick={() => setSelectedWarehouse('')}
-                    className="ml-1 text-orange-600 hover:text-orange-800"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-              {showLowStock && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  Düşük Stok
-                  <button
-                    onClick={() => setShowLowStock(false)}
-                    className="ml-1 text-red-600 hover:text-red-800"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
-            </div>
+        {/* Products Display */}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        )}
-      </div>
+        ) : (
+          <>
+            {/* Products Grid/List */}
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {productsData?.products?.map((product: Product) => {
+                  const stockStatus = getStockStatus(product.current_stock, product.min_stock_level);
+                  const StatusIcon = stockStatus.icon;
+                  
+                  return (
+                    <div key={product.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 truncate">{product.name}</h3>
+                            <p className="text-sm text-gray-500 font-mono">{product.sku}</p>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <StatusIcon className={`h-4 w-4 ${stockStatus.color.split(' ')[0]}`} />
+                          </div>
+                        </div>
 
-      {/* Products Table */}
-      <div className="card">
-        <div className="card-body">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead className="table-header">
-                    <tr>
-                      <th className="table-header-cell">Ürün</th>
-                      <th className="table-header-cell">SKU</th>
-                      <th className="table-header-cell">Kategori</th>
-                      <th className="table-header-cell">Tedarikçi</th>
-                      <th className="table-header-cell">Depo</th>
-                      <th className="table-header-cell">Stok</th>
-                      <th className="table-header-cell">Fiyat</th>
-                      <th className="table-header-cell">Durum</th>
-                      <th className="table-header-cell">İşlemler</th>
-                    </tr>
-                  </thead>
-                  <tbody className="table-body">
-                    {productsData?.products?.map((product: any) => {
-                      const stockStatus = getStockStatus(product.current_stock, product.min_stock_level);
-                      return (
-                        <tr key={product.id}>
-                          <td className="table-cell">
-                            <div>
-                              <div className="font-medium text-gray-900">{product.name}</div>
-                              {product.barcode && (
-                                <div className="text-sm text-gray-500">Barkod: {product.barcode}</div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="table-cell">
-                            <span className="font-mono text-sm">{product.sku}</span>
-                          </td>
-                          <td className="table-cell">
-                            {product.category_name || '-'}
-                          </td>
-                          <td className="table-cell">
-                            {product.supplier_name || '-'}
-                          </td>
-                          <td className="table-cell">
-                            {product.warehouse_name || '-'}
-                          </td>
-                          <td className="table-cell">
-                            <div>
-                              <span className="font-medium">{product.current_stock}</span>
-                              <span className="text-gray-500"> / {product.max_stock_level}</span>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Min: {product.min_stock_level}
-                            </div>
-                          </td>
-                          <td className="table-cell">
-                            <div className="font-medium">₺{product.unit_price}</div>
-                            <div className="text-xs text-gray-500">
-                              Maliyet: ₺{product.cost_price}
-                            </div>
-                          </td>
-                          <td className="table-cell">
-                            <span className={`badge ${stockStatus.color}`}>
+                        <div className="space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Kategori:</span>
+                            <span className="text-gray-900">{product.category_name || '-'}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Stok:</span>
+                            <span className="font-medium">{product.current_stock} {product.unit}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Fiyat:</span>
+                            <span className="font-medium text-green-600">₺{product.unit_price}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stockStatus.color}`}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
                               {stockStatus.label}
                             </span>
-                          </td>
-                          <td className="table-cell">
-                            <div className="flex space-x-2">
-                              <button 
+                            <div className="flex items-center space-x-1">
+                              <button
                                 onClick={() => handleView(product)}
-                                className="text-primary-600 hover:text-primary-900"
+                                className="p-1 text-gray-400 hover:text-blue-600"
                                 title="Görüntüle"
                               >
                                 <Eye className="h-4 w-4" />
                               </button>
                               {hasPermission('products:update') && (
-                                <button 
+                                <button
                                   onClick={() => handleEdit(product)}
-                                  className="text-blue-600 hover:text-blue-900"
+                                  className="p-1 text-gray-400 hover:text-blue-600"
                                   title="Düzenle"
                                 >
                                   <Edit className="h-4 w-4" />
@@ -480,58 +491,162 @@ const Products: React.FC = () => {
                               {hasPermission('products:delete') && (
                                 <button
                                   onClick={() => handleDelete(product.id)}
-                                  className="text-red-600 hover:text-red-900"
+                                  className="p-1 text-gray-400 hover:text-red-600"
                                   title="Sil"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               )}
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              {/* Pagination */}
-              {productsData?.pagination && (
-                <div className="flex items-center justify-between mt-6">
-                  <div className="text-sm text-gray-700">
-                    Toplam {productsData.pagination.total_items} ürün
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="btn-secondary disabled:opacity-50"
-                    >
-                      Önceki
-                    </button>
-                    <span className="px-3 py-2 text-sm text-gray-700">
-                      Sayfa {currentPage} / {productsData.pagination.total_pages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === productsData.pagination.total_pages}
-                      className="btn-secondary disabled:opacity-50"
-                    >
-                      Sonraki
-                    </button>
-                  </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Ürün
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          SKU
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Kategori
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Stok
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Fiyat
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Durum
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          İşlemler
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {productsData?.products?.map((product: Product) => {
+                        const stockStatus = getStockStatus(product.current_stock, product.min_stock_level);
+                        const StatusIcon = stockStatus.icon;
+                        
+                        return (
+                          <tr key={product.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                                {product.barcode && (
+                                  <div className="text-sm text-gray-500">Barkod: {product.barcode}</div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm font-mono text-gray-900">{product.sku}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-900">{product.category_name || '-'}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <span className="text-sm font-medium text-gray-900">{product.current_stock}</span>
+                                <div className="text-xs text-gray-500">Min: {product.min_stock_level}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <span className="text-sm font-medium text-green-600">₺{product.unit_price}</span>
+                                <div className="text-xs text-gray-500">Maliyet: ₺{product.cost_price}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stockStatus.color}`}>
+                                <StatusIcon className="h-3 w-3 mr-1" />
+                                {stockStatus.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex items-center justify-end space-x-2">
+                                <button
+                                  onClick={() => handleView(product)}
+                                  className="text-gray-400 hover:text-blue-600"
+                                  title="Görüntüle"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                                {hasPermission('products:update') && (
+                                  <button
+                                    onClick={() => handleEdit(product)}
+                                    className="text-gray-400 hover:text-blue-600"
+                                    title="Düzenle"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {hasPermission('products:delete') && (
+                                  <button
+                                    onClick={() => handleDelete(product.id)}
+                                    className="text-gray-400 hover:text-red-600"
+                                    title="Sil"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {productsData?.pagination && (
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Toplam <span className="font-medium">{productsData.pagination.total_items}</span> ürün
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Önceki
+                  </button>
+                  <span className="px-3 py-2 text-sm text-gray-700">
+                    Sayfa {currentPage} / {productsData.pagination.total_pages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === productsData.pagination.total_pages}
+                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Sonraki
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Add Product Modal */}
+      {/* Add/Edit Product Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
                 {editingProduct ? 'Ürün Düzenle' : 'Yeni Ürün Ekle'}
               </h2>
@@ -543,7 +658,7 @@ const Products: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Product Name */}
                 <div>
@@ -553,7 +668,7 @@ const Products: React.FC = () => {
                   <input
                     {...register('name', { required: 'Ürün adı gerekli' })}
                     type="text"
-                    className="input"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Ürün adını girin"
                   />
                   {errors.name && (
@@ -570,7 +685,7 @@ const Products: React.FC = () => {
                     <input
                       {...register('sku', { required: 'SKU gerekli' })}
                       type="text"
-                      className="input flex-1"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="SKU otomatik oluşturulacak"
                       readOnly
                     />
@@ -578,9 +693,9 @@ const Products: React.FC = () => {
                       type="button"
                       onClick={() => {
                         const newSKU = generateSKU();
-                        reset({ ...watch(), sku: newSKU });
+                        setValue('sku', newSKU);
                       }}
-                      className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300 transition-colors duration-200"
+                      className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md border border-gray-300 transition-colors duration-200"
                     >
                       Yenile
                     </button>
@@ -694,7 +809,7 @@ const Products: React.FC = () => {
                     })}
                     type="number"
                     step="0.01"
-                    className="input"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0.00"
                   />
                   {errors.price && (
@@ -713,7 +828,7 @@ const Products: React.FC = () => {
                       min: { value: 0, message: 'Minimum stok 0\'dan büyük olmalı' }
                     })}
                     type="number"
-                    className="input"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                   />
                   {errors.min_stock && (
@@ -732,7 +847,7 @@ const Products: React.FC = () => {
                       min: { value: 0, message: 'Başlangıç stoku 0\'dan büyük olmalı' }
                     })}
                     type="number"
-                    className="input"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                   />
                   {errors.initial_stock && (
@@ -742,31 +857,31 @@ const Products: React.FC = () => {
               </div>
 
               {/* Description */}
-              <div>
+              <div className="mt-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Açıklama
                 </label>
                 <textarea
                   {...register('description')}
                   rows={3}
-                  className="input"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Ürün açıklaması..."
                 />
               </div>
 
               {/* Form Actions */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
+              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="btn-secondary"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   disabled={isSubmitting}
                 >
                   İptal
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
@@ -786,9 +901,9 @@ const Products: React.FC = () => {
 
       {/* View Product Modal */}
       {viewingProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">Ürün Detayları</h2>
               <button
                 onClick={closeViewModal}
@@ -798,12 +913,12 @@ const Products: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Product Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Basic Info */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Temel Bilgiler</h3>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Ürün Adı</label>
                       <p className="mt-1 text-sm text-gray-900">{viewingProduct.name}</p>
@@ -831,24 +946,22 @@ const Products: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Stock and Price Info */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Stok ve Fiyat Bilgileri</h3>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Mevcut Stok</label>
-                      <p className="mt-1 text-sm text-gray-900">{viewingProduct.current_stock}</p>
+                      <p className="mt-1 text-sm text-gray-900">{viewingProduct.current_stock} {viewingProduct.unit}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Minimum Stok</label>
-                      <p className="mt-1 text-sm text-gray-900">{viewingProduct.min_stock_level}</p>
+                      <p className="mt-1 text-sm text-gray-900">{viewingProduct.min_stock_level} {viewingProduct.unit}</p>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Maksimum Stok</label>
-                      <p className="mt-1 text-sm text-gray-900">{viewingProduct.max_stock_level}</p>
-                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Birim Fiyat</label>
-                      <p className="mt-1 text-sm text-gray-900">₺{viewingProduct.unit_price}</p>
+                      <p className="mt-1 text-sm text-green-600 font-medium">₺{viewingProduct.unit_price}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Maliyet Fiyatı</label>
@@ -856,7 +969,7 @@ const Products: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Stok Durumu</label>
-                      <span className={`mt-1 inline-block px-2 py-1 text-xs font-medium rounded-full ${getStockStatus(viewingProduct.current_stock, viewingProduct.min_stock_level).color}`}>
+                      <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStockStatus(viewingProduct.current_stock, viewingProduct.min_stock_level).color}`}>
                         {getStockStatus(viewingProduct.current_stock, viewingProduct.min_stock_level).label}
                       </span>
                     </div>
@@ -866,7 +979,7 @@ const Products: React.FC = () => {
 
               {/* Description */}
               {viewingProduct.description && (
-                <div>
+                <div className="mt-8">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Açıklama</h3>
                   <p className="text-sm text-gray-700 bg-gray-50 p-4 rounded-lg">
                     {viewingProduct.description}
@@ -875,11 +988,11 @@ const Products: React.FC = () => {
               )}
 
               {/* Actions */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
+              <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={closeViewModal}
-                  className="btn-secondary"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Kapat
                 </button>
@@ -890,7 +1003,7 @@ const Products: React.FC = () => {
                       closeViewModal();
                       handleEdit(viewingProduct);
                     }}
-                    className="btn-primary"
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     Düzenle
                   </button>

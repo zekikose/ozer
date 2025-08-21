@@ -7,7 +7,7 @@ import axios from 'axios';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Register from './pages/Register';
+
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Categories from './pages/Categories';
@@ -17,12 +17,18 @@ import Warehouses from './pages/Warehouses';
 import StockIn from './pages/StockIn';
 import StockOut from './pages/StockOut';
 import StockMovements from './pages/StockMovements';
+import LoanItems from './pages/LoanItems';
+import LoanReceipt from './pages/LoanReceipt';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import UserManagement from './pages/UserManagement';
 
 // Set axios base URL
-axios.defaults.baseURL = 'http://localhost:5000';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? window.location.origin 
+  : 'http://localhost:5000';
+
+axios.defaults.baseURL = API_BASE_URL;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,7 +65,7 @@ const App: React.FC = () => {
           <div className="App">
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+
               <Route path="/" element={<Layout />}>
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
@@ -71,6 +77,8 @@ const App: React.FC = () => {
                 <Route path="stock-in" element={<ProtectedRoute><StockIn /></ProtectedRoute>} />
                 <Route path="stock-out" element={<ProtectedRoute><StockOut /></ProtectedRoute>} />
                 <Route path="stock-movements" element={<ProtectedRoute><StockMovements /></ProtectedRoute>} />
+                <Route path="loan-items" element={<ProtectedRoute><LoanItems /></ProtectedRoute>} />
+                <Route path="loan-receipt/:id" element={<ProtectedRoute><LoanReceipt /></ProtectedRoute>} />
                 <Route path="reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                 <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="user-management" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />

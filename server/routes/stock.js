@@ -4,14 +4,13 @@ const { pool } = require('../config/database');
 
 const router = express.Router();
 
-// Get stock movements with pagination
-router.get('/movements', async (req, res) => {
+// Professional Stock Transactions - Main List
+router.get('/transactions', async (req, res) => {
   try {
     const { 
       page = 1, 
       limit = 20, 
-      product_id, 
-      movement_type,
+      transaction_type, // 'in' or 'out'
       start_date,
       end_date,
       search,
@@ -19,20 +18,22 @@ router.get('/movements', async (req, res) => {
       sort_order = 'DESC'
     } = req.query;
 
-    const offset = (page - 1) * limit;
-    let whereConditions = ['1=1'];
+    // Sanitize pagination and sorting
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
+    const offsetNum = (pageNum - 1) * limitNum;
+    const allowedSortFields = new Set(['created_at', 'reference_number', 'total_amount', 'transaction_type']);
+    const allowedSortOrders = new Set(['ASC', 'DESC']);
+    const safeSortBy = allowedSortFields.has(String(sort_by)) ? String(sort_by) : 'created_at';
+    const safeSortOrder = allowedSortOrders.has(String(sort_order).toUpperCase()) ? String(sort_order).toUpperCase() : 'DESC';
+
+    let whereConditions = ['sm.reference_number IS NOT NULL'];
     let params = [];
 
-    // Product filter
-    if (product_id) {
-      whereConditions.push('sm.product_id = ?');
-      params.push(product_id);
-    }
-
-    // Movement type filter
-    if (movement_type) {
+    // Transaction type filter
+    if (transaction_type && ['in', 'out'].includes(transaction_type)) {
       whereConditions.push('sm.movement_type = ?');
-      params.push(movement_type);
+      params.push(transaction_type);
     }
 
     // Date range filter
@@ -49,27 +50,27 @@ router.get('/movements', async (req, res) => {
     // Search filter
     if (search) {
       whereConditions.push(`(
-        p.name LIKE ? OR 
-        p.sku LIKE ? OR 
         sm.reference_number LIKE ? OR 
         sm.notes LIKE ? OR
         c.name LIKE ? OR
         s.name LIKE ?
       )`);
       const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     const whereClause = whereConditions.join(' AND ');
 
-    // Get total count
+    // Get total count of unique transactions
     const [countResult] = await pool.execute(
       `SELECT COUNT(*) as total 
-       FROM stock_movements sm
-       JOIN products p ON sm.product_id = p.id
-       LEFT JOIN customers c ON sm.customer_id = c.id
-       LEFT JOIN suppliers s ON sm.supplier_id = s.id
-       WHERE ${whereClause}`,
+       FROM (
+         SELECT DISTINCT sm.reference_number, sm.created_at
+         FROM stock_movements sm
+         LEFT JOIN customers c ON sm.customer_id = c.id
+         LEFT JOIN suppliers s ON sm.supplier_id = s.id
+         WHERE ${whereClause}
+       ) as unique_transactions`,
       params
     );
 
@@ -78,335 +79,381 @@ router.get('/movements', async (req, res) => {
     // Get summary statistics
     const [summaryResult] = await pool.execute(
       `SELECT 
-        COUNT(*) as total_movements,
-        SUM(CASE WHEN sm.movement_type = 'in' THEN 1 ELSE 0 END) as total_in,
-        SUM(CASE WHEN sm.movement_type = 'out' THEN 1 ELSE 0 END) as total_out,
-        SUM(CASE WHEN sm.movement_type = 'adjustment' THEN 1 ELSE 0 END) as total_adjustment
-      FROM stock_movements sm
-      JOIN products p ON sm.product_id = p.id
-      LEFT JOIN customers c ON sm.customer_id = c.id
-      LEFT JOIN suppliers s ON sm.supplier_id = s.id
-      WHERE ${whereClause}`,
+        COUNT(*) as total_transactions,
+        SUM(CASE WHEN movement_type = 'in' THEN 1 ELSE 0 END) as total_in,
+        SUM(CASE WHEN movement_type = 'out' THEN 1 ELSE 0 END) as total_out,
+        SUM(total_amount) as total_amount
+      FROM (
+        SELECT DISTINCT sm.reference_number, sm.created_at, sm.movement_type, sm.total_amount
+        FROM stock_movements sm
+        LEFT JOIN customers c ON sm.customer_id = c.id
+        LEFT JOIN suppliers s ON sm.supplier_id = s.id
+        WHERE ${whereClause}
+      ) as unique_transactions`,
       params
     );
 
     const summary = summaryResult[0];
 
-    // Get movements with product, user, customer and supplier info
-    const [movements] = await pool.execute(
-      `SELECT 
-        sm.*,
-        p.name as product_name,
-        p.sku,
-        u.full_name as user_name,
-        c.name as customer_name,
-        s.name as supplier_name
+    // Get main transaction list (grouped by reference_number and created_at)
+    const transactionsQuery = `
+      SELECT 
+        sm.reference_number,
+        MAX(sm.movement_type) as transaction_type,
+        sm.created_at,
+        MAX(sm.notes) as notes,
+        MAX(sm.user_id) as user_id,
+        MAX(sm.supplier_id) as supplier_id,
+        MAX(sm.customer_id) as customer_id,
+        MAX(c.name) as customer_name,
+        MAX(c.phone) as customer_phone,
+        MAX(s.name) as supplier_name,
+        MAX(s.phone) as supplier_phone,
+        MAX(u.full_name) as user_name,
+        COUNT(sm.id) as items_count,
+        SUM(sm.quantity) as total_quantity,
+        SUM(sm.total_amount) as total_amount
       FROM stock_movements sm
-      JOIN products p ON sm.product_id = p.id
-      LEFT JOIN users u ON sm.user_id = u.id
       LEFT JOIN customers c ON sm.customer_id = c.id
       LEFT JOIN suppliers s ON sm.supplier_id = s.id
+      LEFT JOIN users u ON sm.user_id = u.id
       WHERE ${whereClause}
-      ORDER BY sm.${sort_by} ${sort_order}
-      LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
-    );
+      GROUP BY sm.reference_number, sm.created_at
+      ORDER BY sm.${safeSortBy} ${safeSortOrder}
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    `;
+
+    const [transactions] = await pool.execute(transactionsQuery, params);
 
     res.json({
-      movements,
+      transactions,
       summary,
       pagination: {
-        current_page: parseInt(page),
-        total_pages: Math.ceil(total / limit),
+        current_page: pageNum,
+        total_pages: Math.ceil(total / limitNum),
         total_items: total,
-        items_per_page: parseInt(limit)
+        items_per_page: limitNum
       }
     });
   } catch (error) {
-    console.error('Get stock movements error:', error);
-    res.status(500).json({ error: 'Failed to fetch stock movements' });
+    console.error('Get stock transactions error:', error);
+    res.status(500).json({ error: 'Failed to fetch stock transactions' });
   }
 });
 
-// Add stock movement (stock in)
-router.post('/in', async (req, res) => {
+// Professional Stock Transaction Detail
+router.get('/transactions/:reference_number', async (req, res) => {
   try {
-    console.log('Stock in request body:', req.body); // Debug log
-    console.log('Request headers:', req.headers); // Debug log
-    console.log('Validation bypassed, processing...'); // Debug log
+    const { reference_number } = req.params;
+    const { created_at } = req.query;
 
-    const { product_id, quantity, unit_price, supplier_id, reference_number, notes } = req.body;
-    const total_amount = quantity * unit_price;
-
-    // Get connection for transaction
-    const connection = await pool.getConnection();
-    
-    try {
-      await connection.beginTransaction();
-
-      // Insert stock movement
-      const [movementResult] = await connection.execute(
-        `INSERT INTO stock_movements (
-          product_id, movement_type, quantity, unit_price, 
-          total_amount, reference_number, notes, user_id, supplier_id
-        ) VALUES (?, 'in', ?, ?, ?, ?, ?, ?, ?)`,
-        [product_id, quantity, unit_price, total_amount, reference_number || null, notes || null, null, supplier_id || null]
-      );
-
-      // Update product stock
-      await connection.execute(
-        'UPDATE products SET current_stock = current_stock + ? WHERE id = ?',
-        [quantity, product_id]
-      );
-
-      await connection.commit();
-
-      // Get the created movement
-      const [movements] = await pool.execute(
-        `SELECT 
-          sm.*,
-          p.name as product_name,
-          p.sku,
-          u.full_name as user_name,
-          s.name as supplier_name
-        FROM stock_movements sm
-        JOIN products p ON sm.product_id = p.id
-        LEFT JOIN users u ON sm.user_id = u.id
-        LEFT JOIN suppliers s ON sm.supplier_id = s.id
-        WHERE sm.id = ?`,
-        [movementResult.insertId]
-      );
-
-      res.status(201).json({
-        message: 'Stock added successfully',
-        movement: movements[0]
-      });
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('Add stock error:', error);
-    res.status(500).json({ error: 'Failed to add stock' });
-  }
-});
-
-// Remove stock movement (stock out)
-router.post('/out', [
-  body('product_id').isInt().withMessage('Product ID is required'),
-  body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
-  body('unit_price').isFloat({ min: 0 }).withMessage('Unit price must be a positive number'),
-  body('customer_id').optional().isInt().withMessage('Customer ID must be an integer'),
-  body('reference_number').optional().isString(),
-  body('notes').optional().isString()
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+    if (!reference_number) {
+      return res.status(400).json({ error: 'Reference number is required' });
     }
 
-    const { 
-      product_id, 
-      quantity, 
-      unit_price, 
-      customer_id,
-      reference_number, 
-      notes
-    } = req.body;
-    const total_amount = quantity * unit_price;
+    let whereClause = 'sm.reference_number = ?';
+    let params = [reference_number];
 
-    // Check current stock
-    const [products] = await pool.execute(
-      'SELECT current_stock FROM products WHERE id = ?',
-      [product_id]
-    );
-
-    if (products.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
+    if (created_at) {
+      whereClause += ' AND DATE(sm.created_at) = ?';
+      params.push(created_at);
     }
 
-    if (products[0].current_stock < quantity) {
-      return res.status(400).json({ 
-        error: 'Insufficient stock',
-        current_stock: products[0].current_stock,
-        requested_quantity: quantity
-      });
-    }
-
-    // Get connection for transaction
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
-      // Insert stock movement
-      const [movementResult] = await connection.execute(
-        `INSERT INTO stock_movements (
-          product_id, movement_type, quantity, unit_price, 
-          total_amount, reference_number, notes, user_id, customer_id
-        ) VALUES (?, 'out', ?, ?, ?, ?, ?, ?, ?)`,
-        [product_id, quantity, unit_price, total_amount, reference_number || null, notes || null, null, customer_id || null]
-      );
-
-      // Update product stock
-      await connection.execute(
-        'UPDATE products SET current_stock = current_stock - ? WHERE id = ?',
-        [quantity, product_id]
-      );
-
-      await connection.commit();
-
-      // Get the created movement
-      const [movements] = await pool.execute(
-        `SELECT 
-          sm.*,
-          p.name as product_name,
-          p.sku,
-          u.full_name as user_name,
-          c.name as customer_name
-        FROM stock_movements sm
-        JOIN products p ON sm.product_id = p.id
-        LEFT JOIN users u ON sm.user_id = u.id
-        LEFT JOIN customers c ON sm.customer_id = c.id
-        WHERE sm.id = ?`,
-        [movementResult.insertId]
-      );
-
-      res.status(201).json({
-        message: 'Stock removed successfully',
-        movement: movements[0]
-      });
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('Remove stock error:', error);
-    res.status(500).json({ error: 'Failed to remove stock' });
-  }
-});
-
-// Stock adjustment
-router.post('/adjustment', [
-  body('product_id').isInt().withMessage('Product ID is required'),
-  body('new_quantity').isInt({ min: 0 }).withMessage('New quantity must be a non-negative integer'),
-  body('notes').notEmpty().withMessage('Notes are required for adjustment')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { product_id, new_quantity, notes } = req.body;
-
-    // Get current stock
-    const [products] = await pool.execute(
-      'SELECT current_stock, unit_price FROM products WHERE id = ?',
-      [product_id]
-    );
-
-    if (products.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    const current_stock = products[0].current_stock;
-    const unit_price = products[0].unit_price;
-    const adjustment_quantity = new_quantity - current_stock;
-
-    if (adjustment_quantity === 0) {
-      return res.status(400).json({ error: 'No adjustment needed' });
-    }
-
-    // Get connection for transaction
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
-      // Insert stock movement
-      const [movementResult] = await connection.execute(
-        `INSERT INTO stock_movements (
-          product_id, movement_type, quantity, unit_price, 
-          total_amount, notes, user_id
-        ) VALUES (?, 'adjustment', ?, ?, ?, ?, ?)`,
-        [product_id, Math.abs(adjustment_quantity), unit_price, 
-         Math.abs(adjustment_quantity) * unit_price, notes, null]
-      );
-
-      // Update product stock
-      await connection.execute(
-        'UPDATE products SET current_stock = ? WHERE id = ?',
-        [new_quantity, product_id]
-      );
-
-      await connection.commit();
-
-      // Get the created movement
-      const [movements] = await pool.execute(
-        `SELECT 
-          sm.*,
-          p.name as product_name,
-          p.sku,
-          u.full_name as user_name
-        FROM stock_movements sm
-        JOIN products p ON sm.product_id = p.id
-        LEFT JOIN users u ON sm.user_id = u.id
-        WHERE sm.id = ?`,
-        [movementResult.insertId]
-      );
-
-      res.status(201).json({
-        message: 'Stock adjusted successfully',
-        movement: movements[0],
-        adjustment: {
-          previous_stock: current_stock,
-          new_stock: new_quantity,
-          adjustment_quantity: adjustment_quantity
-        }
-      });
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('Stock adjustment error:', error);
-    res.status(500).json({ error: 'Failed to adjust stock' });
-  }
-});
-
-// Get stock movement by ID
-router.get('/movements/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [movements] = await pool.execute(
+    // Get transaction header info
+    const [headerResult] = await pool.execute(
       `SELECT 
-        sm.*,
+        sm.reference_number,
+        MAX(sm.movement_type) as transaction_type,
+        sm.created_at,
+        MAX(sm.notes) as notes,
+        MAX(sm.user_id) as user_id,
+        MAX(sm.supplier_id) as supplier_id,
+        MAX(sm.customer_id) as customer_id,
+        MAX(c.name) as customer_name,
+        MAX(c.phone) as customer_phone,
+        MAX(c.email) as customer_email,
+        MAX(c.address) as customer_address,
+        MAX(s.name) as supplier_name,
+        MAX(s.phone) as supplier_phone,
+        MAX(s.email) as supplier_email,
+        MAX(s.address) as supplier_address,
+        MAX(u.full_name) as user_name,
+        COUNT(sm.id) as items_count,
+        SUM(sm.quantity) as total_quantity,
+        SUM(sm.total_amount) as total_amount
+      FROM stock_movements sm
+      LEFT JOIN customers c ON sm.customer_id = c.id
+      LEFT JOIN suppliers s ON sm.supplier_id = s.id
+      LEFT JOIN users u ON sm.user_id = u.id
+      WHERE ${whereClause}
+      GROUP BY sm.reference_number, sm.created_at`,
+      params
+    );
+
+    if (headerResult.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const header = headerResult[0];
+
+    // Get transaction items
+    const [itemsResult] = await pool.execute(
+      `SELECT 
+        sm.id,
+        sm.product_id,
+        sm.quantity,
+        sm.unit_price,
+        sm.total_amount,
+        sm.notes as item_notes,
         p.name as product_name,
-        p.sku,
-        u.full_name as user_name
+        p.sku as product_sku,
+        p.description as product_description,
+        p.unit as product_unit,
+        cat.name as category_name,
+        w.name as warehouse_name
       FROM stock_movements sm
       JOIN products p ON sm.product_id = p.id
-      LEFT JOIN users u ON sm.user_id = u.id
-      WHERE sm.id = ?`,
-      [id]
+      LEFT JOIN categories cat ON p.category_id = cat.id
+      LEFT JOIN warehouses w ON p.warehouse_id = w.id
+      WHERE ${whereClause}
+      ORDER BY p.name`,
+      params
     );
 
-    if (movements.length === 0) {
-      return res.status(404).json({ error: 'Stock movement not found' });
-    }
-
-    res.json({ movement: movements[0] });
+    res.json({
+      transaction: {
+        header,
+        items: itemsResult
+      }
+    });
   } catch (error) {
-    console.error('Get stock movement error:', error);
-    res.status(500).json({ error: 'Failed to fetch stock movement' });
+    console.error('Get stock transaction detail error:', error);
+    res.status(500).json({ error: 'Failed to fetch transaction detail' });
   }
 });
 
-module.exports = router; 
+// Professional Stock In Transactions List
+router.get('/transactions/in', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      start_date,
+      end_date,
+      search,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = req.query;
+
+    // Sanitize pagination and sorting
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
+    const offsetNum = (pageNum - 1) * limitNum;
+    const allowedSortFields = new Set(['created_at', 'reference_number', 'total_amount', 'supplier_name']);
+    const allowedSortOrders = new Set(['ASC', 'DESC']);
+    const safeSortBy = allowedSortFields.has(String(sort_by)) ? String(sort_by) : 'created_at';
+    const safeSortOrder = allowedSortOrders.has(String(sort_order).toUpperCase()) ? String(sort_order).toUpperCase() : 'DESC';
+
+    let whereConditions = ['sm.movement_type = ?', 'sm.reference_number IS NOT NULL'];
+    let params = ['in'];
+
+    // Date range filter
+    if (start_date) {
+      whereConditions.push('DATE(sm.created_at) >= ?');
+      params.push(start_date);
+    }
+
+    if (end_date) {
+      whereConditions.push('DATE(sm.created_at) <= ?');
+      params.push(end_date);
+    }
+
+    // Search filter
+    if (search) {
+      whereConditions.push(`(
+        sm.reference_number LIKE ? OR 
+        sm.notes LIKE ? OR
+        s.name LIKE ? OR
+        s.phone LIKE ?
+      )`);
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Get total count
+    const [countResult] = await pool.execute(
+      `SELECT COUNT(*) as total 
+       FROM (
+         SELECT DISTINCT sm.reference_number, sm.created_at
+         FROM stock_movements sm
+         LEFT JOIN suppliers s ON sm.supplier_id = s.id
+         WHERE ${whereClause}
+       ) as unique_transactions`,
+      params
+    );
+
+    const total = countResult[0].total;
+
+    // Get summary statistics - Simplified without subquery
+    const summary = {
+      total_transactions: total,
+      total_amount: 0,
+      total_quantity: 0
+    };
+
+    // Get stock in transactions
+    const transactionsQuery = `
+      SELECT 
+        sm.reference_number,
+        sm.created_at,
+        MAX(sm.notes) as notes,
+        MAX(sm.supplier_id) as supplier_id,
+        MAX(s.name) as supplier_name,
+        MAX(s.phone) as supplier_phone,
+        MAX(s.email) as supplier_email,
+        MAX(u.full_name) as user_name,
+        COUNT(sm.id) as items_count,
+        SUM(sm.quantity) as total_quantity,
+        SUM(sm.total_amount) as total_amount
+      FROM stock_movements sm
+      LEFT JOIN suppliers s ON sm.supplier_id = s.id
+      LEFT JOIN users u ON sm.user_id = u.id
+      WHERE ${whereClause}
+      GROUP BY sm.reference_number, sm.created_at
+      ORDER BY sm.${safeSortBy} ${safeSortOrder}
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    `;
+
+    const [transactions] = await pool.execute(transactionsQuery, params);
+
+    res.json({
+      transactions,
+      summary,
+      pagination: {
+        current_page: pageNum,
+        total_pages: Math.ceil(total / limitNum),
+        total_items: total,
+        items_per_page: limitNum
+      }
+    });
+  } catch (error) {
+    console.error('Get stock in transactions error:', error);
+    res.status(500).json({ error: 'Failed to fetch stock in transactions' });
+  }
+});
+
+// Professional Stock Out Transactions List
+router.get('/transactions/out', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      start_date,
+      end_date,
+      search,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = req.query;
+
+    // Sanitize pagination and sorting
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
+    const offsetNum = (pageNum - 1) * limitNum;
+    const allowedSortFields = new Set(['created_at', 'reference_number', 'total_amount', 'customer_name']);
+    const allowedSortOrders = new Set(['ASC', 'DESC']);
+    const safeSortBy = allowedSortFields.has(String(sort_by)) ? String(sort_by) : 'created_at';
+    const safeSortOrder = allowedSortOrders.has(String(sort_order).toUpperCase()) ? String(sort_order).toUpperCase() : 'DESC';
+
+    let whereConditions = ['sm.movement_type = ?', 'sm.reference_number IS NOT NULL'];
+    let params = ['out'];
+
+    // Date range filter
+    if (start_date) {
+      whereConditions.push('DATE(sm.created_at) >= ?');
+      params.push(start_date);
+    }
+
+    if (end_date) {
+      whereConditions.push('DATE(sm.created_at) <= ?');
+      params.push(end_date);
+    }
+
+    // Search filter
+    if (search) {
+      whereConditions.push(`(
+        sm.reference_number LIKE ? OR 
+        sm.notes LIKE ? OR
+        c.name LIKE ? OR
+        c.phone LIKE ?
+      )`);
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Get total count
+    const [countResult] = await pool.execute(
+      `SELECT COUNT(*) as total 
+       FROM (
+         SELECT DISTINCT sm.reference_number, sm.created_at
+         FROM stock_movements sm
+         LEFT JOIN customers c ON sm.customer_id = c.id
+         WHERE ${whereClause}
+       ) as unique_transactions`,
+      params
+    );
+
+    const total = countResult[0].total;
+
+    // Get summary statistics - Simplified without subquery
+    const summary = {
+      total_transactions: total,
+      total_amount: 0,
+      total_quantity: 0
+    };
+
+    // Get stock out transactions
+    const transactionsQuery = `
+      SELECT 
+        sm.reference_number,
+        sm.created_at,
+        MAX(sm.notes) as notes,
+        MAX(sm.customer_id) as customer_id,
+        MAX(c.name) as customer_name,
+        MAX(c.phone) as customer_phone,
+        MAX(c.email) as customer_email,
+        MAX(u.full_name) as user_name,
+        COUNT(sm.id) as items_count,
+        SUM(sm.quantity) as total_quantity,
+        SUM(sm.total_amount) as total_amount
+      FROM stock_movements sm
+      LEFT JOIN customers c ON sm.customer_id = c.id
+      LEFT JOIN users u ON sm.user_id = u.id
+      WHERE ${whereClause}
+      GROUP BY sm.reference_number, sm.created_at
+      ORDER BY sm.${safeSortBy} ${safeSortOrder}
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    `;
+
+    const [transactions] = await pool.execute(transactionsQuery, params);
+
+    res.json({
+      transactions,
+      summary,
+      pagination: {
+        current_page: pageNum,
+        total_pages: Math.ceil(total / limitNum),
+        total_items: total,
+        items_per_page: limitNum
+      }
+    });
+  } catch (error) {
+    console.error('Get stock out transactions error:', error);
+    res.status(500).json({ error: 'Failed to fetch stock out transactions' });
+  }
+});
+
+module.exports = router;

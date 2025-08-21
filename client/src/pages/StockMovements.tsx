@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Fragment } from 'react';
 import { useQuery } from 'react-query';
 import { Filter, ArrowUp, ArrowDown, AlertTriangle, Search, Calendar, Package, RefreshCw } from 'lucide-react';
 import axios from 'axios';
@@ -6,6 +6,7 @@ import SelectBox2 from '../components/SelectBox2';
 
 const StockMovements: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({
     product_id: '',
     movement_type: '',
@@ -72,6 +73,16 @@ const StockMovements: React.FC = () => {
       search: ''
     });
     setCurrentPage(1);
+  };
+
+  const toggleGroupDetails = (movementId: number) => {
+    const newExpandedGroups = new Set(expandedGroups);
+    if (newExpandedGroups.has(movementId)) {
+      newExpandedGroups.delete(movementId);
+    } else {
+      newExpandedGroups.add(movementId);
+    }
+    setExpandedGroups(newExpandedGroups);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -239,7 +250,7 @@ const StockMovements: React.FC = () => {
             
             {/* Results Count */}
             <div className="text-sm text-gray-600">
-              {movementsData?.pagination?.total_items || 0} sonuç bulundu
+              {movementsData?.pagination?.total || 0} sonuç bulundu
             </div>
           </div>
         </div>
@@ -263,6 +274,7 @@ const StockMovements: React.FC = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giriş/Çıkış Tarihi</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ürün</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Miktar</th>
@@ -275,7 +287,7 @@ const StockMovements: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {movementsData?.movements?.map((movement: any) => (
-                      <tr key={movement.id} className="hover:bg-gray-50 transition-colors duration-150">
+                      <tr key={movement.id} className={`hover:bg-gray-50 transition-colors duration-150 ${movement.is_grouped ? 'bg-blue-50' : ''}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {new Date(movement.created_at).toLocaleDateString('tr-TR')}
@@ -285,9 +297,53 @@ const StockMovements: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {movement.movement_type === 'in' && movement.entry_date ? (
+                              <>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {new Date(movement.entry_date).toLocaleDateString('tr-TR')}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(movement.entry_date).toLocaleTimeString('tr-TR')}
+                                </div>
+                              </>
+                            ) : movement.movement_type === 'out' && movement.exit_date ? (
+                              <>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {new Date(movement.exit_date).toLocaleDateString('tr-TR')}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(movement.exit_date).toLocaleTimeString('tr-TR')}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{movement.product_name}</div>
-                            <div className="text-sm text-gray-500">{movement.sku}</div>
+                            {movement.is_grouped ? (
+                              <div>
+                                <div className="text-sm font-medium text-blue-900">
+                                  {movement.products_count} Ürün (Çoklu Çıkış)
+                                </div>
+                                <div className="text-xs text-blue-600">
+                                  Ref: {movement.reference_number}
+                                </div>
+                                <button
+                                  onClick={() => toggleGroupDetails(movement.id)}
+                                  className="text-xs text-blue-500 hover:text-blue-700 underline mt-1"
+                                >
+                                  Detayları Göster
+                                </button>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{movement.product_name}</div>
+                                <div className="text-sm text-gray-500">{movement.product_sku}</div>
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -307,12 +363,12 @@ const StockMovements: React.FC = () => {
                                 : 'text-yellow-600'
                           }`}>
                             {movement.movement_type === 'in' ? '+' : movement.movement_type === 'out' ? '-' : '±'}
-                            {movement.quantity}
+                            {movement.is_grouped ? movement.total_quantity : movement.quantity}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            ₺{parseFloat(movement.unit_price).toFixed(2)}
+                            ₺{parseFloat(movement.unit_price || 0).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -324,7 +380,7 @@ const StockMovements: React.FC = () => {
                                 : 'text-yellow-600'
                           }`}>
                             {movement.movement_type === 'in' ? '+' : movement.movement_type === 'out' ? '-' : '±'}
-                            ₺{parseFloat(movement.total_amount).toFixed(2)}
+                            ₺{parseFloat(movement.is_grouped ? movement.total_amount : movement.total_amount || 0).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -342,12 +398,12 @@ const StockMovements: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-600">
-                            {movement.user_name || '-'}
+                            {movement.created_by || '-'}
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-600 max-w-xs truncate">
-                            {movement.notes || '-'}
+                            {movement.reason || '-'}
                           </div>
                         </td>
                       </tr>
@@ -360,7 +416,7 @@ const StockMovements: React.FC = () => {
               {movementsData?.pagination && (
                 <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
                   <div className="text-sm text-gray-700">
-                    Toplam {movementsData.pagination.total_items} hareket
+                    Toplam {movementsData.pagination.total} hareket
                   </div>
                   <div className="flex space-x-2">
                     <button
@@ -371,158 +427,15 @@ const StockMovements: React.FC = () => {
                       Önceki
                     </button>
                     <span className="px-3 py-2 text-sm text-gray-700 bg-gray-50 rounded-md">
-                      Sayfa {currentPage} / {movementsData.pagination.total_pages}
+                      Sayfa {currentPage} / {movementsData.pagination.pages}
                     </span>
                     <button
                       onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === movementsData.pagination.total_pages}
+                      disabled={currentPage === movementsData.pagination.pages}
                       className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                     >
                       Sonraki
                     </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Summary Statistics */}
-              {movementsData?.movements && movementsData.movements.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                      <Filter className="h-5 w-5 mr-2 text-blue-600" />
-                      Filtrelenmiş Sonuçların Özeti
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {/* Movement Counts */}
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Toplam Hareket</p>
-                            <p className="text-2xl font-bold text-blue-600">
-                              {movementsData.summary?.total_movements || 0}
-                            </p>
-                          </div>
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <Filter className="h-6 w-6 text-blue-600" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Giriş İşlemleri</p>
-                            <p className="text-2xl font-bold text-green-600">
-                              {movementsData.summary?.total_in || 0}
-                            </p>
-                          </div>
-                          <div className="p-2 bg-green-100 rounded-lg">
-                            <ArrowUp className="h-6 w-6 text-green-600" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Çıkış İşlemleri</p>
-                            <p className="text-2xl font-bold text-red-600">
-                              {movementsData.summary?.total_out || 0}
-                            </p>
-                          </div>
-                          <div className="p-2 bg-red-100 rounded-lg">
-                            <ArrowDown className="h-6 w-6 text-red-600" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Düzeltme İşlemleri</p>
-                            <p className="text-2xl font-bold text-yellow-600">
-                              {movementsData.summary?.total_adjustment || 0}
-                            </p>
-                          </div>
-                          <div className="p-2 bg-yellow-100 rounded-lg">
-                            <AlertTriangle className="h-6 w-6 text-yellow-600" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Amount and Quantity Totals */}
-                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                        <h5 className="text-sm font-medium text-gray-700 mb-3">Miktar Toplamları</h5>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Giriş Miktarı:</span>
-                            <span className="text-sm font-medium text-green-600">
-                              +{movementsData.movements
-                                .filter((m: any) => m.movement_type === 'in')
-                                .reduce((sum: number, m: any) => sum + parseInt(m.quantity), 0)
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Çıkış Miktarı:</span>
-                            <span className="text-sm font-medium text-red-600">
-                              -{movementsData.movements
-                                .filter((m: any) => m.movement_type === 'out')
-                                .reduce((sum: number, m: any) => sum + parseInt(m.quantity), 0)
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Düzeltme Miktarı:</span>
-                            <span className="text-sm font-medium text-yellow-600">
-                              ±{movementsData.movements
-                                .filter((m: any) => m.movement_type === 'adjustment')
-                                .reduce((sum: number, m: any) => sum + parseInt(m.quantity), 0)
-                              }
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                        <h5 className="text-sm font-medium text-gray-700 mb-3">Tutar Toplamları</h5>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Giriş Tutarı:</span>
-                            <span className="text-sm font-medium text-green-600">
-                              +₺{movementsData.movements
-                                .filter((m: any) => m.movement_type === 'in')
-                                .reduce((sum: number, m: any) => sum + parseFloat(m.total_amount), 0)
-                                .toFixed(2)
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Çıkış Tutarı:</span>
-                            <span className="text-sm font-medium text-red-600">
-                              -₺{movementsData.movements
-                                .filter((m: any) => m.movement_type === 'out')
-                                .reduce((sum: number, m: any) => sum + parseFloat(m.total_amount), 0)
-                                .toFixed(2)
-                              }
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Düzeltme Tutarı:</span>
-                            <span className="text-sm font-medium text-yellow-600">
-                              ±₺{movementsData.movements
-                                .filter((m: any) => m.movement_type === 'adjustment')
-                                .reduce((sum: number, m: any) => sum + parseFloat(m.total_amount), 0)
-                                .toFixed(2)
-                              }
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}

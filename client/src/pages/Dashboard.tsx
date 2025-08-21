@@ -57,10 +57,7 @@ const Dashboard: React.FC = () => {
     return { status: 'normal', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
   };
 
-  const getStockPercentage = (product: any) => {
-    if (product.max_stock_level === 0) return 0;
-    return Math.min((product.current_stock / product.max_stock_level) * 100, 100);
-  };
+
 
   if (isLoading) {
     return (
@@ -253,7 +250,6 @@ const Dashboard: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredProducts.map((product: any) => {
                 const stockStatus = getStockStatus(product);
-                const stockPercentage = getStockPercentage(product);
                 
                 return (
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors">
@@ -285,22 +281,11 @@ const Dashboard: React.FC = () => {
                           </span>
                         </div>
                         
-                        {/* Stock Progress Bar */}
-                        <div className="flex-1 max-w-24">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full transition-all ${
-                                stockStatus.status === 'out' ? 'bg-red-500' :
-                                stockStatus.status === 'low' ? 'bg-orange-500' : 'bg-green-500'
-                              }`}
-                              style={{ width: `${stockPercentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
+
                       </div>
                       
                       <div className="text-xs text-gray-500 mt-1">
-                        Min: {product.min_stock_level} | Max: {product.max_stock_level}
+                        Min: {product.min_stock_level}
                       </div>
                     </td>
                     

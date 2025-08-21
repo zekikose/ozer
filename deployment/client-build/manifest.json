@@ -1,0 +1,16 @@
+{
+  "short_name": "SMSTK",
+  "name": "SMSTK Stok Yönetim Sistemi",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1f2937",
+  "background_color": "#ffffff",
+  "description": "Modern stok yönetim sistemi"
+}

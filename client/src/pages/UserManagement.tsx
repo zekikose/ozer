@@ -5,8 +5,7 @@ import {
   Search, 
   Edit, 
   Trash2, 
-  User, 
-  Shield, 
+  User as UserIcon, 
   Mail, 
   Calendar,
   Eye,
@@ -55,7 +54,7 @@ const UserManagement: React.FC = () => {
   });
 
   // Fetch users
-  const { data: users, isLoading, refetch } = useQuery('users', async () => {
+  const { data: users, isLoading } = useQuery('users', async () => {
     const response = await axios.get('/api/users');
     return response.data;
   });
@@ -272,7 +271,7 @@ const UserManagement: React.FC = () => {
                   <td className="table-cell">
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                        <User className="h-5 w-5 text-primary-600" />
+                        <UserIcon className="h-5 w-5 text-primary-600" />
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{user.full_name}</div>

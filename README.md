@@ -1,280 +1,205 @@
-# 🚀 SMSTK - Stok Yönetim Sistemi
+# 🚀 SMSTK - Modern Stok Yönetim Sistemi
 
-Modern ve kullanıcı dostu stok yönetim sistemi. React frontend ve Node.js backend ile geliştirilmiştir.
+Modern ve kullanıcı dostu stok yönetim sistemi. React.js + Node.js ile geliştirilmiştir.
 
-## 📁 Proje Yapısı
+## 📋 Özellikler
 
-```
-smstk/
-├── 📁 client/                 # React Frontend
-├── 📁 server/                 # Node.js Backend
-├── 📁 docs/                   # Dokümantasyon
-├── 📁 deployment/             # Deployment Dosyaları
-├── 📁 scripts/                # Otomatik Scriptler
-├── 📁 node_modules/           # Node.js Bağımlılıkları
-├── package.json               # Proje Konfigürasyonu
-└── README.md                  # Bu Dosya
-```
+### ✅ Kullanıcı Yönetimi
+- JWT tabanlı kimlik doğrulama
+- Rol tabanlı yetkilendirme (admin, manager, stock_keeper, viewer)
+- Güvenli şifre hashleme
 
-## 🚀 Hızlı Başlangıç
+### ✅ Stok Yönetimi
+- Ürün ekleme/düzenleme/silme
+- Kategori yönetimi
+- Stok giriş/çıkış işlemleri
+- Gerçek zamanlı stok takibi
+- Minimum/maksimum stok seviyesi uyarıları
+
+### ✅ Tedarikçi ve Müşteri Yönetimi
+- Tedarikçi bilgileri ve iletişim
+- Müşteri bilgileri ve kredi limiti
+- Adres ve iletişim bilgileri
+
+### ✅ Depo Yönetimi
+- Çoklu depo desteği
+- Depo kapasitesi takibi
+- Depo yöneticisi atama
+
+### ✅ Raporlama
+- Dashboard istatistikleri
+- Stok hareket raporları
+- Gerçek zamanlı veriler
+- Grafik ve tablolar
+
+## 🛠️ Teknolojiler
+
+### Frontend
+- **React 18** - UI framework
+- **TypeScript** - Tip güvenliği
+- **React Router** - Sayfa yönlendirme
+- **React Query** - Veri yönetimi
+- **React Hook Form** - Form yönetimi
+- **Tailwind CSS** - Styling
+- **Lucide React** - İkonlar
+- **Recharts** - Grafikler
+
+### Backend
+- **Node.js** - Runtime
+- **Express.js** - Web framework
+- **MySQL** - Veritabanı
+- **JWT** - Kimlik doğrulama
+- **bcryptjs** - Şifre hashleme
+- **CORS** - Cross-origin desteği
+- **Helmet** - Güvenlik
+- **Rate Limiting** - API koruması
+
+## 🚀 Kurulum
 
 ### Gereksinimler
 - Node.js 18+
 - MySQL 8.0+ veya MariaDB 10.5+
 - npm veya yarn
 
-### Kurulum
-
-#### 1. Bağımlılıkları Yükleyin
+### Adım 1: Projeyi İndirin
 ```bash
-# Ana bağımlılıklar
-npm install
-
-# Backend bağımlılıkları
-cd server && npm install
-
-# Frontend bağımlılıkları
-cd client && npm install
+git clone <repository-url>
+cd smstk
 ```
 
-#### 2. Veritabanını Kurun
+### Adım 2: Backend Kurulumu
 ```bash
-# MySQL'de veritabanı oluşturun
-CREATE DATABASE smstk_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-#### 3. Environment Dosyalarını Ayarlayın
-```bash
-# Backend (.env)
 cd server
-cp env.example .env
-# .env dosyasını düzenleyin
+npm install
 ```
 
-#### 4. Uygulamayı Başlatın
+### Adım 3: Frontend Kurulumu
 ```bash
-# Backend (Terminal 1)
-cd server && npm start
+cd ../client
+npm install
+```
 
-# Frontend (Terminal 2)
+### Adım 4: Environment Ayarları
+
+#### Backend (.env)
+```bash
+cd ../server
+cp env.example .env
+```
+
+`.env` dosyasını düzenleyin:
+```env
+PORT=5000
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=smstk_db
+JWT_SECRET=your_jwt_secret
+CORS_ORIGIN=http://localhost:3000
+```
+
+#### Frontend
+Frontend otomatik olarak `http://localhost:5000` API'sine bağlanır.
+
+### Adım 5: Veritabanını Oluşturun
+```sql
+CREATE DATABASE smstk_db;
+```
+
+### Adım 6: Uygulamayı Başlatın
+
+#### Geliştirme Modu (Her iki servisi aynı anda)
+```bash
+npm run dev
+```
+
+#### Ayrı Ayrı Başlatma
+```bash
+# Backend
+cd server && npm run dev
+
+# Frontend (yeni terminal)
 cd client && npm start
 ```
 
-## 📚 Dokümantasyon
+## 📁 Proje Yapısı
 
-### 📁 docs/ Klasörü
-- **README.md** - Ana proje dokümantasyonu
-- **HIZLI_BASLANGIC.md** - 5 dakikada kurulum rehberi
-- **ISPManager_DEPLOYMENT_GUIDE.md** - ISPManager deployment rehberi
-- **ISPManager_QUICK_START.md** - ISPManager hızlı başlangıç
-- **SUNUCU_YUKLEME_REHBERI.md** - Sunucuya yükleme rehberi
-- **SUNUCU_YUKLEME_ADIMLARI.md** - Detaylı yükleme adımları
-- **SUNUCU_DEPLOYMENT_REHBERI.md** - Sunucu deployment rehberi
-- **502-HIZLI_COZUM.md** - 502 Bad Gateway hızlı çözüm
-- **502-sorun-giderme.md** - 502 hatası detaylı sorun giderme
-- **sunucu-bilgileri-form.md** - Sunucu bilgileri toplama formu
-
-## 🚀 Deployment
-
-### 📁 deployment/ Klasörü
-- **smstk-final-deployment.tar.gz** - Final deployment paketi
-- **cpanel-deploy/** - cPanel deployment dosyaları
-- **ispmanager-config/** - ISPManager konfigürasyon dosyaları
-- **production/** - Production ortam dosyaları
-
-### Sunucuya Yükleme
-```bash
-# 1. Deployment paketini sunucuya yükleyin
-scp deployment/smstk-final-deployment.tar.gz root@your-server:/tmp/
-
-# 2. Sunucuda açın
-ssh root@your-server
-cd /tmp && tar -xzf smstk-final-deployment.tar.gz
-
-# 3. Otomatik kurulum
-cd smstk-final-deployment
-chmod +x scripts/quick-deploy-ispmanager.sh
-./scripts/quick-deploy-ispmanager.sh
+```
+smstk/
+├── client/                 # React.js Frontend
+│   ├── src/
+│   │   ├── components/     # Yeniden kullanılabilir bileşenler
+│   │   ├── pages/         # Sayfa bileşenleri
+│   │   ├── contexts/      # React Context'leri
+│   │   └── utils/         # Yardımcı fonksiyonlar
+│   └── public/            # Statik dosyalar
+├── server/                # Node.js Backend
+│   ├── routes/           # API route'ları
+│   ├── middleware/       # Middleware'ler
+│   ├── config/          # Konfigürasyon dosyaları
+│   └── scripts/         # Yardımcı scriptler
+└── README.md            # Bu dosya
 ```
 
-## 🔧 Scriptler
+## 🌐 Erişim
 
-### 📁 scripts/ Klasörü
-- **build.sh** - Proje build scripti
-- **deploy-ispmanager.sh** - ISPManager deployment scripti
-- **quick-deploy-ispmanager.sh** - Hızlı deployment scripti
-- **fix-502-error.sh** - 502 Bad Gateway düzeltme scripti
-- **cpanel-deploy.sh** - cPanel deployment scripti
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:5000
+- **API Health Check**: http://localhost:5000/api/health
 
-### Script Kullanımı
-```bash
-# Hızlı deployment
-./scripts/quick-deploy-ispmanager.sh
+## 🔧 API Endpoints
 
-# Manuel deployment
-./scripts/deploy-ispmanager.sh yourdomain.com your_password your_jwt_secret
+### Kimlik Doğrulama
+- `POST /api/auth/login` - Giriş
+- `POST /api/auth/register` - Kayıt
+- `POST /api/auth/logout` - Çıkış
 
-# 502 hatası düzeltme
-./scripts/fix-502-error.sh yourdomain.com
-```
-
-## 🌐 Özellikler
-
-### Kullanıcı Yönetimi
-- ✅ Kullanıcı kaydı ve girişi
-- ✅ Rol tabanlı yetkilendirme
-- ✅ Güvenli JWT authentication
-
-### Stok Yönetimi
-- ✅ Ürün ekleme/düzenleme/silme
-- ✅ Kategori yönetimi
-- ✅ Stok giriş/çıkış işlemleri
-- ✅ Stok seviyesi takibi
-
-### Tedarikçi ve Müşteri Yönetimi
-- ✅ Tedarikçi bilgileri
-- ✅ Müşteri bilgileri
-- ✅ İletişim bilgileri
-
-### Raporlama
-- ✅ Stok raporları
-- ✅ Hareket raporları
-- ✅ Dashboard istatistikleri
-
-### Dosya Yönetimi
-- ✅ Ürün resimleri
-- ✅ Dosya yükleme
-- ✅ Güvenli dosya saklama
-
-## 🔒 Güvenlik
-
-- ✅ JWT token authentication
-- ✅ Şifre hashleme (bcrypt)
-- ✅ CORS koruması
-- ✅ Rate limiting
-- ✅ Input validation
-- ✅ SQL injection koruması
-
-## 🛠️ Teknolojiler
-
-### Frontend
-- **React 18** - UI framework
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling
-- **React Router** - Navigation
-- **Axios** - HTTP client
-- **React Query** - Data fetching
-- **React Hook Form** - Form management
-- **Lucide React** - Icons
-- **Recharts** - Charts
-
-### Backend
-- **Node.js** - Runtime
-- **Express.js** - Web framework
-- **MySQL2** - Database
-- **JWT** - Authentication
-- **bcryptjs** - Password hashing
-- **multer** - File upload
-- **cors** - CORS handling
-- **helmet** - Security headers
-- **express-validator** - Input validation
-
-## 📊 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Kullanıcı kaydı
-- `POST /api/auth/login` - Kullanıcı girişi
-- `GET /api/auth/profile` - Profil bilgileri
-
-### Products
+### Ürünler
 - `GET /api/products` - Ürün listesi
 - `POST /api/products` - Yeni ürün
-- `PUT /api/products/:id` - Ürün güncelleme
-- `DELETE /api/products/:id` - Ürün silme
+- `PUT /api/products/:id` - Ürün güncelle
+- `DELETE /api/products/:id` - Ürün sil
 
-### Categories
+### Kategoriler
 - `GET /api/categories` - Kategori listesi
 - `POST /api/categories` - Yeni kategori
-- `PUT /api/categories/:id` - Kategori güncelleme
-- `DELETE /api/categories/:id` - Kategori silme
+- `PUT /api/categories/:id` - Kategori güncelle
+- `DELETE /api/categories/:id` - Kategori sil
 
-### Stock Movements
-- `GET /api/stock` - Stok hareketleri
+### Stok İşlemleri
+- `GET /api/stock/movements` - Stok hareketleri
 - `POST /api/stock/in` - Stok girişi
 - `POST /api/stock/out` - Stok çıkışı
 
-## 🚨 Sorun Giderme
+## 🚀 Production Deployment
 
-### 502 Bad Gateway Hatası
+### Build
 ```bash
-# Otomatik düzeltme
-./scripts/fix-502-error.sh yourdomain.com
+# Frontend build
+cd client && npm run build
 
-# Manuel düzeltme
-pm2 restart smstk-backend
-curl http://localhost:5000/api/health
+# Backend (production modu)
+cd server && npm start
 ```
 
-### Veritabanı Bağlantı Hatası
-```bash
-# MySQL durumu
-systemctl status mysql
+### Environment Variables
+Production ortamında güvenlik için:
+- Güçlü JWT_SECRET kullanın
+- CORS_ORIGIN'i production URL'inize ayarlayın
+- Rate limiting ayarlarını optimize edin
 
-# Bağlantı testi
-mysql -u smstk_user -p smstk_db -e "SELECT 1;"
-```
+## 📝 Lisans
 
-### Dosya İzinleri
-```bash
-# İzinleri düzelt
-chown -R www-data:www-data /var/www/yourdomain.com/
-chmod -R 755 /var/www/yourdomain.com/
-```
-
-## 📞 Destek
-
-### Log Dosyaları
-- **PM2**: `pm2 logs smstk-backend`
-- **Backend**: `/var/www/yourdomain.com/logs/`
-- **Nginx**: `/var/log/nginx/`
-- **MySQL**: `/var/log/mysql/`
-
-### Faydalı Komutlar
-```bash
-# Sistem durumu
-htop
-df -h
-free -h
-
-# Servis durumları
-systemctl status nginx mysql
-
-# Port dinleme
-netstat -tlnp
-lsof -i :5000 -i :3000
-```
-
-## 📄 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır.
+MIT License
 
 ## 🤝 Katkıda Bulunma
 
-1. Fork yapın
+1. Fork edin
 2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'Add amazing feature'`)
-4. Push yapın (`git push origin feature/amazing-feature`)
+3. Commit edin (`git commit -m 'Add amazing feature'`)
+4. Push edin (`git push origin feature/amazing-feature`)
 5. Pull Request oluşturun
 
----
+## 📞 İletişim
 
-## 🎉 Başarıyla Kuruldu!
-
-**Varsayılan Giriş Bilgileri:**
-- **Kullanıcı**: `admin`
-- **Şifre**: `admin123`
-
-**Önemli Notlar:**
-- Güvenlik için admin şifresini değiştirin
-- Düzenli yedekleme yapın
-- Sistem güncellemelerini takip edin 
+Proje Linki: [https://github.com/your-username/smstk](https://github.com/your-username/smstk) 

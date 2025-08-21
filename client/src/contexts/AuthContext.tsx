@@ -15,7 +15,6 @@ interface AuthContextType {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  register: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   hasPermission: (permission: string) => boolean;
 }
 
@@ -98,21 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
   };
 
-  const register = async (firstName: string, lastName: string, email: string, password: string) => {
-    try {
-      const response = await axios.post('/api/auth/register', {
-        firstName,
-        lastName,
-        email,
-        password,
-      });
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      setUser(user);
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Registration failed');
-    }
-  };
+
 
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
@@ -167,7 +152,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     login,
     logout,
-    register,
     hasPermission,
   };
 

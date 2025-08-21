@@ -15,6 +15,7 @@ interface StockInForm {
   supplier_id: string;
   reference_number: string;
   notes: string;
+  entry_date: string;
 }
 
 interface NewProductForm {
@@ -64,7 +65,7 @@ const StockIn: React.FC = () => {
 
   // Fetch products
   const { data: products } = useQuery('products', async () => {
-    const response = await axios.get('/api/products');
+    const response = await axios.get('/api/products?limit=1000');
     return response.data.products;
   });
 
@@ -93,6 +94,7 @@ const StockIn: React.FC = () => {
 
   // Filter products based on search
   const filteredProducts = products?.filter((product: any) =>
+    !productSearch || 
     product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
     product.sku.toLowerCase().includes(productSearch.toLowerCase())
   ) || [];
@@ -121,15 +123,14 @@ const StockIn: React.FC = () => {
   // Stock in mutation
   const stockInMutation = useMutation(
     async (data: StockInForm) => {
-      console.log('Sending data:', data); // Debug log
       const requestData = {
         ...data,
         product_id: parseInt(data.product_id),
         supplier_id: data.supplier_id ? parseInt(data.supplier_id) : undefined,
         quantity: parseInt(data.quantity),
-        unit_price: parseFloat(data.unit_price)
+        unit_price: parseFloat(data.unit_price),
+        entry_date: data.entry_date
       };
-      console.log('Request data:', requestData); // Debug log
       const response = await axios.post('/api/stock/in', requestData);
       return response.data;
     },
@@ -153,7 +154,6 @@ const StockIn: React.FC = () => {
   // Create new product mutation
   const createProductMutation = useMutation(
     async (data: NewProductForm) => {
-      console.log('Creating product with data:', data); // Debug log
       const requestData = {
         ...data,
         category_id: parseInt(data.category_id),
@@ -163,7 +163,6 @@ const StockIn: React.FC = () => {
         min_stock: parseInt(data.min_stock),
         initial_stock: parseInt(data.initial_stock)
       };
-      console.log('Request data:', requestData); // Debug log
       const response = await axios.post('/api/products', requestData);
       return response.data;
     },
@@ -255,37 +254,35 @@ const StockIn: React.FC = () => {
                     setShowProductDropdown(true);
                   }}
                   onFocus={() => setShowProductDropdown(true)}
-                  className="input w-full pr-20"
+                  className="input w-full pr-10"
                 />
-                <Search className="absolute right-12 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <button
-                  type="button"
-                  onClick={() => setShowNewProductModal(true)}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 btn-primary text-xs px-3 py-1.5"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Yeni
-                </button>
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               </div>
               
-              {showProductDropdown && filteredProducts.length > 0 && (
+              {showProductDropdown && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                  {filteredProducts.map((product: any) => (
-                    <div
-                      key={product.id}
-                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
-                      onClick={() => {
-                        setValue('product_id', product.id.toString());
-                        setProductSearch(product.name);
-                        setShowProductDropdown(false);
-                      }}
-                    >
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-gray-600">
-                        SKU: {product.sku} | Mevcut Stok: {product.current_stock}
+                  {filteredProducts.length > 0 ? (
+                    filteredProducts.map((product: any) => (
+                      <div
+                        key={product.id}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                        onClick={() => {
+                          setValue('product_id', product.id.toString());
+                          setProductSearch(product.name);
+                          setShowProductDropdown(false);
+                        }}
+                      >
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-gray-600">
+                          SKU: {product.sku} | Mevcut Stok: {product.current_stock}
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-2 text-gray-500 text-sm">
+                      Ürün bulunamadı
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
               
@@ -386,6 +383,24 @@ const StockIn: React.FC = () => {
                 className="input"
                 placeholder="Fatura/İrsaliye no"
               />
+            </div>
+
+            {/* Entry Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Giriş Tarihi *
+              </label>
+              <input
+                {...register('entry_date', { 
+                  required: 'Giriş tarihi gerekli'
+                })}
+                type="datetime-local"
+                className="input"
+                defaultValue={new Date().toISOString().slice(0, 16)}
+              />
+              {errors.entry_date && (
+                <p className="mt-1 text-sm text-red-600">{errors.entry_date.message}</p>
+              )}
             </div>
           </div>
 

@@ -27,8 +27,7 @@
   "author": "SMSTK Team",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "gh-pages": "^6.3.0"
+    "concurrently": "^8.2.2"
   },
   "engines": {
     "node": ">=18.0.0",
