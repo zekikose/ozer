@@ -368,7 +368,7 @@ const StockIn: React.FC = () => {
                 })) || []}
                 value={watch('supplier_id') || ''}
                 onChange={(value) => setValue('supplier_id', value.toString())}
-                placeholder="Tedarikçi seçin"
+                placeholder="Tedarikçi seçin (isteğe bağlı)"
               />
             </div>
 
