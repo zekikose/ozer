@@ -456,4 +456,89 @@ router.get('/transactions/out', async (req, res) => {
   }
 });
 
+// Stock In API - Multiple Items
+router.post('/in', async (req, res) => {
+  try {
+    const { supplier_id, reference_number, notes, entry_date, items } = req.body;
+
+    // Validate required fields
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'En az bir ürün eklemelisiniz' });
+    }
+
+    // Validate items
+    for (const item of items) {
+      if (!item.product_id || !item.quantity || !item.unit_price) {
+        return res.status(400).json({ error: 'Tüm ürünler için gerekli alanları doldurun' });
+      }
+    }
+
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Generate reference number if not provided
+      const finalReferenceNumber = reference_number || `STK-IN-${Date.now()}`;
+      const finalEntryDate = entry_date || new Date().toISOString();
+
+      // Insert stock movements for each item
+      for (const item of items) {
+        const [result] = await connection.execute(
+          `INSERT INTO stock_movements (
+            product_id, 
+            quantity, 
+            unit_price, 
+            total_amount, 
+            movement_type, 
+            supplier_id, 
+            reference_number, 
+            notes, 
+            created_at,
+            user_id
+          ) VALUES (?, ?, ?, ?, 'in', ?, ?, ?, ?, ?)`,
+          [
+            parseInt(item.product_id),
+            parseInt(item.quantity),
+            parseFloat(item.unit_price),
+            item.total_amount,
+            supplier_id ? parseInt(supplier_id) : null,
+            finalReferenceNumber,
+            notes || '',
+            finalEntryDate,
+            req.user?.id || null
+          ]
+        );
+
+        // Update product stock
+        await connection.execute(
+          `UPDATE products 
+           SET current_stock = current_stock + ?, 
+               updated_at = NOW() 
+           WHERE id = ?`,
+          [parseInt(item.quantity), parseInt(item.product_id)]
+        );
+      }
+
+      await connection.commit();
+
+      res.json({
+        success: true,
+        message: 'Stok girişi başarıyla yapıldı',
+        reference_number: finalReferenceNumber,
+        items_count: items.length
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+  } catch (error) {
+    console.error('Stock in error:', error);
+    res.status(500).json({ error: 'Stok girişi yapılırken hata oluştu' });
+  }
+});
+
 module.exports = router;

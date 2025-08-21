@@ -1,21 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useLocation } from 'react-router-dom';
-import { ArrowUp, Search, Plus, X, Eye, Calendar, Hash, User } from 'lucide-react';
+import { ArrowUp, Search, Plus, X, Eye, Calendar, Hash, User, Package } from 'lucide-react';
 import SelectBox2 from '../components/SelectBox2';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { generateSKU } from '../utils/skuGenerator';
 
-interface StockInForm {
+interface StockInItem {
   product_id: string;
   quantity: string;
   unit_price: string;
+  total_amount: number;
+}
+
+interface StockInForm {
   supplier_id: string;
   reference_number: string;
   notes: string;
   entry_date: string;
+  items: StockInItem[];
 }
 
 interface NewProductForm {
@@ -71,17 +76,14 @@ interface StockInDetail {
 const StockIn: React.FC = () => {
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [productSearch, setProductSearch] = useState('');
-  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [items, setItems] = useState<StockInItem[]>([]);
   const [showNewProductModal, setShowNewProductModal] = useState(false);
-  const [showStockInModal, setShowStockInModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<StockInDetail | null>(null);
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
@@ -100,10 +102,6 @@ const StockIn: React.FC = () => {
     setValue: setValueNewProduct,
     formState: { errors: newProductErrors },
   } = useForm<NewProductForm>();
-
-  const selectedProductId = watch('product_id');
-  const selectedQuantity = watch('quantity');
-  const selectedUnitPrice = watch('unit_price');
 
   // Fetch products
   const { data: products } = useQuery('products', async () => {
@@ -138,50 +136,21 @@ const StockIn: React.FC = () => {
     }
   );
 
-  const selectedProduct = products?.find((p: any) => p.id.toString() === selectedProductId);
-  const totalAmount = (selectedQuantity && selectedUnitPrice) 
-    ? parseFloat(selectedQuantity.toString()) * parseFloat(selectedUnitPrice.toString())
-    : 0;
-
-  // Filter products based on search
-  const filteredProducts = products?.filter((product: any) =>
-    !productSearch || 
-    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    product.sku.toLowerCase().includes(productSearch.toLowerCase())
-  ) || [];
-
-  // Load selected product from location state
-  useEffect(() => {
-    const selectedProduct = location.state?.selectedProduct;
-    if (selectedProduct) {
-      setValue('product_id', selectedProduct.id.toString());
-      toast.success(`${selectedProduct.name} ürünü seçildi!`);
-    }
-  }, [location.state, setValue]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowProductDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   // Stock in mutation
   const stockInMutation = useMutation(
     async (data: StockInForm) => {
       const requestData = {
         ...data,
-        product_id: parseInt(data.product_id),
         supplier_id: data.supplier_id ? parseInt(data.supplier_id) : undefined,
-        quantity: parseInt(data.quantity),
-        unit_price: parseFloat(data.unit_price),
-        entry_date: data.entry_date
+        entry_date: data.entry_date,
+        items: data.items.map(item => ({
+          product_id: parseInt(item.product_id),
+          quantity: parseInt(item.quantity),
+          unit_price: parseFloat(item.unit_price),
+          total_amount: item.total_amount
+        }))
       };
+      console.log('Sending request data:', requestData);
       const response = await axios.post('/api/stock/in', requestData);
       return response.data;
     },
@@ -189,7 +158,7 @@ const StockIn: React.FC = () => {
       onSuccess: () => {
         toast.success('Stok girişi başarıyla yapıldı!');
         reset();
-        setShowStockInModal(false);
+        setItems([]);
         queryClient.invalidateQueries('products');
         queryClient.invalidateQueries('stock-movements');
         queryClient.invalidateQueries('stock-in-transactions');
@@ -222,8 +191,16 @@ const StockIn: React.FC = () => {
         resetNewProduct();
         setShowNewProductModal(false);
         queryClient.invalidateQueries('products');
-        setValue('product_id', data.product.id.toString());
-        setProductSearch(data.product.name);
+        // Add the new product to the first empty item or create a new item
+        const emptyItemIndex = items.findIndex(item => !item.product_id);
+        if (emptyItemIndex !== -1) {
+          updateItem(emptyItemIndex, 'product_id', data.product.id.toString());
+        } else {
+          addItem();
+          setTimeout(() => {
+            updateItem(items.length, 'product_id', data.product.id.toString());
+          }, 100);
+        }
       },
       onError: (error: any) => {
         console.error('Create product error:', error.response?.data);
@@ -233,12 +210,82 @@ const StockIn: React.FC = () => {
   );
 
   const onSubmit = async (data: StockInForm) => {
+    if (items.length === 0) {
+      toast.error('En az bir ürün eklemelisiniz');
+      return;
+    }
+
+    // Validate that all items have required fields
+    const invalidItems = items.filter(item => 
+      !item.product_id || !item.quantity || !item.unit_price
+    );
+    
+    if (invalidItems.length > 0) {
+      console.log('Invalid items:', invalidItems);
+      toast.error('Lütfen tüm ürünler için gerekli alanları doldurun');
+      return;
+    }
+
+    // Additional validation for product_id
+    const itemsWithEmptyProductId = items.filter(item => 
+      item.product_id === '' || item.product_id === null || item.product_id === undefined
+    );
+    
+    if (itemsWithEmptyProductId.length > 0) {
+      console.log('Items with empty product_id:', itemsWithEmptyProductId);
+      toast.error('Lütfen tüm ürünler için ürün seçimi yapın');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
-      await stockInMutation.mutateAsync(data);
+      const formData = {
+        ...data,
+        items: items
+      };
+      console.log('Submitting form data:', formData);
+      await stockInMutation.mutateAsync(formData);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper functions
+  const addItem = () => {
+    const newItem: StockInItem = {
+      product_id: '',
+      quantity: '',
+      unit_price: '',
+      total_amount: 0
+    };
+    console.log('Adding new item:', newItem);
+    setItems([...items, newItem]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof StockInItem, value: string | number) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    
+    // Calculate total amount
+    if (field === 'quantity' || field === 'unit_price') {
+      const quantity = field === 'quantity' ? parseFloat(value.toString()) : parseFloat(updatedItems[index].quantity);
+      const unitPrice = field === 'unit_price' ? parseFloat(value.toString()) : parseFloat(updatedItems[index].unit_price);
+      updatedItems[index].total_amount = quantity * unitPrice;
+    }
+    
+    // Log the update for debugging
+    console.log(`Updating item ${index}, field ${field}, value:`, value);
+    console.log('Updated item:', updatedItems[index]);
+    
+    setItems(updatedItems);
+  };
+
+  const getTotalAmount = () => {
+    return items.reduce((total, item) => total + item.total_amount, 0);
   };
 
   // View transaction detail
@@ -262,6 +309,21 @@ const StockIn: React.FC = () => {
     }
   }, [watchedProductName, setValueNewProduct]);
 
+  // Load selected product from location state
+  useEffect(() => {
+    const selectedProduct = location.state?.selectedProduct;
+    if (selectedProduct) {
+      const newItem: StockInItem = {
+        product_id: selectedProduct.id.toString(),
+        quantity: '',
+        unit_price: selectedProduct.unit_price?.toString() || '',
+        total_amount: 0
+      };
+      setItems([newItem]);
+      toast.success(`${selectedProduct.name} ürünü eklendi!`);
+    }
+  }, [location.state]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('tr-TR', {
       year: 'numeric',
@@ -283,13 +345,225 @@ const StockIn: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Stok Giriş Yönetimi</h1>
-        <button
-          onClick={() => setShowStockInModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <Plus size={20} />
-          Stok Giriş Yap
-        </button>
+      </div>
+
+      {/* Stock In Form */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Stok Giriş Yap</h2>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Supplier and General Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Supplier Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tedarikçi
+              </label>
+              <SelectBox2
+                options={suppliers?.map((supplier: any) => ({
+                  value: supplier.id.toString(),
+                  label: supplier.name
+                })) || []}
+                value={watch('supplier_id') || ''}
+                onChange={(value) => setValue('supplier_id', value.toString())}
+                placeholder="Tedarikçi seçin"
+              />
+            </div>
+
+            {/* Entry Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Giriş Tarihi *
+              </label>
+              <input
+                type="datetime-local"
+                {...register('entry_date', { required: 'Giriş tarihi gereklidir' })}
+                defaultValue={new Date().toISOString().slice(0, 16)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {errors.entry_date && (
+                <p className="mt-1 text-sm text-red-600">{errors.entry_date.message}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Reference Number and Notes */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Referans Numarası
+              </label>
+              <input
+                type="text"
+                {...register('reference_number')}
+                placeholder="Referans numarası"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notlar
+              </label>
+              <input
+                type="text"
+                {...register('notes')}
+                placeholder="Notlar"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Products Section */}
+          <div className="border-t pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Ürünler</h3>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewProductModal(true)}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Yeni Ürün
+                </button>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Ürün Ekle
+                </button>
+              </div>
+            </div>
+
+            {/* Products List */}
+            {items.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Henüz ürün eklenmemiş. Ürün eklemek için "Ürün Ekle" butonuna tıklayın.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {items.map((item, index) => {
+                  const selectedProduct = products?.find((p: any) => p.id.toString() === item.product_id);
+                  return (
+                    <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium text-gray-900">Ürün #{index + 1}</h4>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          Kaldır
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* Product Selection */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Ürün *
+                          </label>
+                          <SelectBox2
+                            options={products?.map((product: any) => ({
+                              value: product.id.toString(),
+                              label: `${product.name} (SKU: ${product.sku} | Stok: ${product.current_stock})`
+                            })) || []}
+                            value={item.product_id}
+                            onChange={(value) => {
+                              console.log('Product selected:', value);
+                              if (value && value.toString().trim() !== '') {
+                                updateItem(index, 'product_id', value.toString());
+                              } else {
+                                console.log('Empty product value selected');
+                              }
+                            }}
+                            placeholder="Ürün seçin"
+                            required
+                          />
+                          {selectedProduct && (
+                            <div className="mt-2 p-2 bg-white rounded-md text-xs text-gray-600">
+                              Mevcut Stok: <span className="font-medium">{selectedProduct.current_stock}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quantity */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Miktar *
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Miktar"
+                            required
+                          />
+                        </div>
+
+                        {/* Unit Price */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Birim Fiyat (₺) *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.unit_price}
+                            onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="0.00"
+                            required
+                          />
+                        </div>
+
+                        {/* Total Amount */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Toplam Tutar
+                          </label>
+                          <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-900 font-medium">
+                            ₺{item.total_amount.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Total Amount */}
+            {items.length > 0 && (
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-medium text-gray-900">Toplam Tutar:</span>
+                  <span className="text-2xl font-bold text-blue-600">₺{getTotalAmount().toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end pt-6">
+            <button
+              type="submit"
+              disabled={isSubmitting || items.length === 0}
+              className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ArrowUp className="h-4 w-4" />
+              <span>{isSubmitting ? 'İşleniyor...' : 'Stok Girişi Yap'}</span>
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Stock In List */}
@@ -415,213 +689,6 @@ const StockIn: React.FC = () => {
           </>
         )}
       </div>
-
-      {/* Stock In Modal */}
-      {showStockInModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Stok Giriş Yap</h2>
-              <button
-                onClick={() => setShowStockInModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {/* Product Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ürün Seçimi
-                </label>
-                <div className="relative" ref={dropdownRef}>
-                  <input
-                    type="text"
-                    placeholder="Ürün ara..."
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value);
-                      setShowProductDropdown(true);
-                    }}
-                    onFocus={() => setShowProductDropdown(true)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  
-                  {showProductDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      <div className="p-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowNewProductModal(true)}
-                          className="w-full text-left px-3 py-2 text-blue-600 hover:bg-blue-50 rounded flex items-center gap-2"
-                        >
-                          <Plus size={16} />
-                          Yeni Ürün Ekle
-                        </button>
-                      </div>
-                      {filteredProducts.map((product: any) => (
-                        <button
-                          key={product.id}
-                          type="button"
-                          onClick={() => {
-                            setValue('product_id', product.id.toString());
-                            setProductSearch(product.name);
-                            setShowProductDropdown(false);
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-100 border-t border-gray-100"
-                        >
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-gray-500">SKU: {product.sku}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {selectedProduct && (
-                  <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                    <div className="font-medium">{selectedProduct.name}</div>
-                    <div className="text-sm text-gray-600">SKU: {selectedProduct.sku}</div>
-                    <div className="text-sm text-gray-600">Mevcut Stok: {selectedProduct.stock_quantity || 0}</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Quantity and Unit Price */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Miktar
-                  </label>
-                  <input
-                    type="number"
-                    {...register('quantity', { required: 'Miktar gerekli' })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
-                  />
-                  {errors.quantity && (
-                    <p className="text-red-500 text-sm mt-1">{errors.quantity.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Birim Fiyat
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    {...register('unit_price', { required: 'Birim fiyat gerekli' })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0.00"
-                  />
-                  {errors.unit_price && (
-                    <p className="text-red-500 text-sm mt-1">{errors.unit_price.message}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Total Amount */}
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">Toplam Tutar:</div>
-                <div className="text-lg font-semibold text-green-600">
-                  {formatCurrency(totalAmount.toString())}
-                </div>
-              </div>
-
-              {/* Supplier */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tedarikçi
-                </label>
-                <select
-                  {...register('supplier_id')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Tedarikçi seçin</option>
-                  {suppliers?.map((supplier: any) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Reference Number */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Referans Numarası
-                </label>
-                <input
-                  type="text"
-                  {...register('reference_number', { required: 'Referans numarası gerekli' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="STK-2024-001"
-                />
-                {errors.reference_number && (
-                  <p className="text-red-500 text-sm mt-1">{errors.reference_number.message}</p>
-                )}
-              </div>
-
-              {/* Entry Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Giriş Tarihi
-                </label>
-                <input
-                  type="date"
-                  {...register('entry_date', { required: 'Giriş tarihi gerekli' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                {errors.entry_date && (
-                  <p className="text-red-500 text-sm mt-1">{errors.entry_date.message}</p>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notlar
-                </label>
-                <textarea
-                  {...register('notes')}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Stok girişi hakkında notlar..."
-                />
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowStockInModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  İptal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Kaydediliyor...
-                    </>
-                  ) : (
-                    <>
-                      <ArrowUp size={16} />
-                      Stok Girişi Yap
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Transaction Detail Modal */}
       {showDetailModal && selectedTransaction && (
