@@ -7,7 +7,6 @@ import {
   User, 
   Calendar,
   DollarSign,
-  Hash,
   ArrowLeft,
   Printer,
   Download

@@ -8,8 +8,6 @@ import {
   Eye, 
   X, 
   Filter,
-  Download,
-  Upload,
   RefreshCw,
   Package,
   TrendingUp,

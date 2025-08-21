@@ -38,9 +38,7 @@ const StockOut: React.FC = () => {
     formState: { errors },
   } = useForm<StockOutForm>();
 
-  const selectedCustomerId = watch('customer_id');
-  const selectedExitDate = watch('exit_date');
-  const selectedIsLoan = watch('is_loan');
+
 
   // Fetch products
   const { data: products } = useQuery('products', async () => {

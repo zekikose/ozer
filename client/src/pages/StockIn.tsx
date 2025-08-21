@@ -37,8 +37,7 @@ const StockIn: React.FC = () => {
     formState: { errors },
   } = useForm<StockInForm>();
 
-  const selectedSupplierId = watch('supplier_id');
-  const selectedEntryDate = watch('entry_date');
+
 
   // Fetch products
   const { data: products } = useQuery('products', async () => {
