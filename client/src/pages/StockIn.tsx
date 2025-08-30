@@ -84,7 +84,12 @@ const StockIn: React.FC = () => {
   );
 
   const onSubmit = async (data: StockInForm) => {
+    console.log('onSubmit called with data:', data);
+    console.log('Current items state:', items);
+    console.log('Items length:', items.length);
+    
     if (items.length === 0) {
+      console.log('No items found, showing error');
       toast.error('En az bir ürün eklemelisiniz');
       return;
     }
@@ -93,6 +98,8 @@ const StockIn: React.FC = () => {
     const invalidItems = items.filter(item => 
       !item.product_id || !item.quantity || !item.unit_price
     );
+    
+    console.log('Invalid items found:', invalidItems);
     
     if (invalidItems.length > 0) {
       console.log('Invalid items:', invalidItems);
@@ -104,6 +111,8 @@ const StockIn: React.FC = () => {
     const itemsWithEmptyProductId = items.filter(item => 
       item.product_id === '' || item.product_id === null || item.product_id === undefined
     );
+    
+    console.log('Items with empty product_id:', itemsWithEmptyProductId);
     
     if (itemsWithEmptyProductId.length > 0) {
       console.log('Items with empty product_id:', itemsWithEmptyProductId);
@@ -118,6 +127,7 @@ const StockIn: React.FC = () => {
         items: items
       };
       console.log('Submitting form data:', formData);
+      console.log('Items being sent:', formData.items);
       await stockInMutation.mutateAsync(formData);
     } finally {
       setIsSubmitting(false);
@@ -148,8 +158,8 @@ const StockIn: React.FC = () => {
     
     // Calculate total amount
     if (field === 'quantity' || field === 'unit_price') {
-      const quantity = field === 'quantity' ? parseFloat(value.toString()) : parseFloat(updatedItems[index].quantity);
-      const unitPrice = field === 'unit_price' ? parseFloat(value.toString()) : parseFloat(updatedItems[index].unit_price);
+      const quantity = field === 'quantity' ? parseFloat(value.toString()) || 0 : parseFloat(updatedItems[index].quantity) || 0;
+      const unitPrice = field === 'unit_price' ? parseFloat(value.toString()) || 0 : parseFloat(updatedItems[index].unit_price) || 0;
       updatedItems[index].total_amount = quantity * unitPrice;
     }
     
