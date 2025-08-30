@@ -85,6 +85,9 @@ const StockIn: React.FC = () => {
   );
 
   const onSubmit = async (data: StockInForm) => {
+    console.log('Form submitted with items:', items);
+    console.log('Items length:', items.length);
+    
     if (items.length === 0) {
       toast.error('En az bir ürün eklemelisiniz');
       return;
@@ -135,7 +138,10 @@ const StockIn: React.FC = () => {
       total_amount: 0
     };
     console.log('Adding new item:', newItem);
-    setItems([...items, newItem]);
+    console.log('Current items before adding:', items);
+    // Yeni ürünü en üste ekle
+    setItems([newItem, ...items]);
+    console.log('Items after adding:', [newItem, ...items]);
   };
 
   const removeItem = (index: number) => {
@@ -174,7 +180,8 @@ const StockIn: React.FC = () => {
         unit_price: selectedProduct.unit_price?.toString() || '',
         total_amount: 0
       };
-      setItems([newItem]);
+      // Yeni ürünü en üste ekle
+      setItems(prevItems => [newItem, ...prevItems]);
       toast.success(`${selectedProduct.name} ürünü eklendi!`);
     }
   }, [location.state]);
