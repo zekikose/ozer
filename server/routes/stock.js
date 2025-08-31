@@ -459,7 +459,7 @@ router.get('/transactions/out', async (req, res) => {
 // Stock In API - Multiple Items
 router.post('/in', async (req, res) => {
   try {
-    const { supplier_id, reference_number, notes, entry_date, items } = req.body;
+    const { notes, entry_date, items } = req.body;
 
     // Validate required fields
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -468,7 +468,7 @@ router.post('/in', async (req, res) => {
 
     // Validate items
     for (const item of items) {
-      if (!item.product_id || !item.quantity || !item.unit_price) {
+      if (!item.product_id || !item.quantity) {
         return res.status(400).json({ error: 'Tüm ürünler için gerekli alanları doldurun' });
       }
     }
@@ -477,8 +477,8 @@ router.post('/in', async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      // Generate reference number if not provided
-      const finalReferenceNumber = reference_number || `STK-IN-${Date.now()}`;
+      // Generate reference number
+      const finalReferenceNumber = `STK-IN-${Date.now()}`;
       const finalEntryDate = entry_date || new Date().toISOString();
 
       // Insert stock movements for each item
@@ -499,9 +499,9 @@ router.post('/in', async (req, res) => {
           [
             parseInt(item.product_id),
             parseInt(item.quantity),
-            parseFloat(item.unit_price),
-            item.total_amount,
-            supplier_id ? parseInt(supplier_id) : null,
+            parseFloat(item.unit_price || 0),
+            item.total_amount || 0,
+            null, // supplier_id is now part of the item
             finalReferenceNumber,
             notes || '',
             finalEntryDate,
