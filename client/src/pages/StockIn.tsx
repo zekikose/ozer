@@ -73,7 +73,6 @@ const StockIn: React.FC = () => {
         queryClient.invalidateQueries('stockMovements');
         toast.success('Stok girişi başarıyla kaydedildi');
         reset();
-        setItems([]);
       },
       onError: (error: any) => {
         console.error('Stock in error:', error.response?.data);
@@ -127,8 +126,8 @@ const StockIn: React.FC = () => {
         items: items
       };
       console.log('Submitting form data:', formData);
-      console.log('Items being sent:', formData.items);
       await stockInMutation.mutateAsync(formData);
+      setItems([]);
     } finally {
       setIsSubmitting(false);
     }
@@ -143,9 +142,7 @@ const StockIn: React.FC = () => {
       total_amount: 0
     };
     console.log('Adding new item:', newItem);
-    console.log('Current items before adding:', items);
-    setItems([newItem, ...items]);
-    console.log('Items after adding:', [newItem, ...items]);
+    setItems([...items, newItem]);
   };
 
   const removeItem = (index: number) => {
@@ -184,7 +181,7 @@ const StockIn: React.FC = () => {
         unit_price: selectedProduct.unit_price?.toString() || '',
         total_amount: 0
       };
-      setItems(prevItems => [newItem, ...prevItems]);
+      setItems([newItem]);
       toast.success(`${selectedProduct.name} ürünü eklendi!`);
     }
   }, [location.state]);
